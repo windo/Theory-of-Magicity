@@ -1,0 +1,422 @@
+#!/usr/bin/python
+
+import time, os, sys, math
+from random import random
+
+import pygame
+from pygame.locals import *
+
+class SpriteLoader:
+      """
+      Load images and divide them to separate surfaces
+      """
+      class NoImage(Exception):
+            def __init__(self, name):
+	        self.name = name
+	    def __str__(self):
+	        return "No Image %s" % (self.name) 
+
+      def __init__(self):
+          self.lists  = {}
+	  self.images = {}
+
+      def load(self, filename, listname = False, width = False, start = 0, to = False):
+          # load the file, if not already loaded
+          if not self.images.has_key(filename):
+	    self.images[filename] = pygame.image.load("img/" + filename)
+	  img = self.images[filename]
+
+          # make an image list as well?
+          if listname:
+	    if not width:
+	      self.lists[listname] = [img]
+	    else:
+	      # use all subsurfaces?
+	      if not to:
+	        to = int(img.get_width() / width)
+	      self.lists[listname] = []
+	      for i in xrange(start, to):
+	        rect = [ i * width, 0, width, img.get_height() ]
+	        self.lists[listname].append(img.subsurface(rect))
+
+      def get(self, name):
+          if name in self.images.keys():
+            return self.images[name]
+	  elif name in self.lists.keys():
+	    return self.lists[name]
+	  else:
+	    raise NoImage(name)
+
+class View:
+      """
+      Viewport/scale to use for translating in-game coordinates to screen coordinates
+      """
+      def __init__(self, view, plane):
+          """
+	  view is (width, height) - input/output scale
+	  plane is (x1, y1, x2, y2) - the MagicField area to fit in the view
+	  """
+	  self.view  = list(view)
+	  self.plane = list(plane)
+	  self.recalculate()
+      def recalculate(self):
+          view_w, view_h = self.view
+	  plane_x1, plane_y1, plane_x2, plane_y2 = self.plane
+	  plane_w = plane_x2 - plane_x1
+	  plane_h = plane_y2 - plane_y1
+	  # multiplier to get plane coordinates from view coordinates
+	  self.mult_x = float(plane_w) / float(view_w)
+	  self.mult_y = float(plane_h) / float(view_h)
+	  # offset to apply to plane coordinates
+	  self.offset_x = plane_x1
+	  self.offset_y = plane_y2
+
+      def get_center_x(self):
+          return self.plane[0] + float(self.plane[2] - self.plane[0]) / 2.0
+      def move_x(self, x):
+          self.offset_x += x
+	  self.plane[0] += x
+	  self.plane[2] += x
+
+      def sc2pl_x(self, x):
+          return x * self.mult_x + self.offset_x
+      def sc2pl_y(self, y):
+          return self.offset_y - y * self.mult_y
+      def pl2sc_x(self, x):
+          return (x - self.offset_x) / self.mult_x
+      def pl2sc_y(self, y):
+          return (self.offset_y - y) / self.mult_y
+
+class Actor:
+      const_speed  = 0.0
+
+      anim_speed   = 1.0
+      hover_height = 0.0
+      def __init__(self, pos):
+          # movement params
+          self.speed  = 0
+	  self.pos    = pos
+
+	  # animation params
+	  self.direction = -1
+	  self.moving    = False
+
+      def move_left(self):
+          self.speed     = -self.const_speed
+	  self.moving    = True
+	  self.direction = -1
+      def move_right(self):
+	  self.speed = self.const_speed
+	  self.moving    = True
+	  self.direction = 1
+      def stop(self):
+          self.speed     = 0
+	  self.moving    = False
+
+      def update(self):
+          if self.speed:
+            self.pos  += self.speed * fields.get(OilField).v(self.pos)
+      
+      # draw image list in same direction
+      def draw_symmetrical(self, screen):
+	  imgs = len(self.img_list)
+	  imgnum = int(time.time() * imgs * self.anim_speed) % imgs
+	  img = self.img_list[imgnum]
+	  # draw the actor hovering in air
+	  if self.hover_height:
+	    hover = self.hover_height + self.hover_height * math.sin(time.time() * 2) * 0.3
+	  else:
+	    hover = 0.0
+	  coords = (view.pl2sc_x(self.pos) - img.get_width() / 2, 200 - img.get_height() - hover)
+          screen.blit(img, coords)
+
+      def draw_directed(self, screen):
+          # motion images
+	  if self.moving:
+	    self.current_image_index = int(time.time() * self.image_count * self.anim_speed) % self.image_count
+	  else:
+	    self.current_image_index = 0
+
+	  # facing direction
+          if self.direction > 0:
+	    imglist = self.img_right
+	  else:
+	    imglist = self.img_left
+	  img = imglist[self.current_image_index]
+
+	  # actually draw self
+	  coords = (view.pl2sc_x(self.pos) - img.get_width() / 2 , 200 - img.get_height() - self.hover_height)
+          screen.blit(img, coords)
+
+class MagicField:
+      """
+      An abstract magic field, currently consisting of
+      normal distribution "particles"
+      """
+      # granularity of drawing the field
+      drawpoints = 150
+
+      def __init__(self):
+	  self.visibility = False
+	  self.particles  = []
+
+      # could be overloaded
+      def v(self, pos):
+          return self.particle_values(pos) + 0.01 * random()
+
+      # add a new normal distribution
+      def add_particle(self, particle):
+          self.particles.append(particle)
+      def del_particle(self, particle):
+          self.particles.pop(self.particles.index(particle))
+      # add all particles together
+      def particle_values(self, pos):
+	  v = 0.0
+	  for particle in self.particles:
+	    mean, dev, mult = particle.get_params()
+	    v += 1 / (dev * math.sqrt(2 * math.pi)) * math.exp((-(pos - mean) ** 2)/(2 * dev ** 2)) * mult
+	  return v
+
+      # draw the field on screen
+      def toggle_visibility(self, set = None):
+          if set == None:
+            self.visibility = not self.visibility
+	  else:
+	    self.visibility = set
+      # Get the field's value at pos as translated through the view
+      def sc_value(self, pos):
+          return pos, view.pl2sc_y(self.v(view.sc2pl_x(pos)))
+      def draw(self, screen):
+	  if self.visibility:
+	    # step should be float to cover the whole range
+            step = float(screen.get_width()) / float(self.drawpoints)
+            for pos in xrange(self.drawpoints):
+              pygame.draw.line(screen, self.color, self.sc_value(pos * step), self.sc_value((pos + 1) * step))
+
+class MagicFields:
+      def __init__(self):
+          self.fields = { }
+	  self.get(FireField)
+	  self.get(IceField)
+	  self.get(OilField)
+
+      # Class method, store different fields in class and return them
+      def get(self, fieldtype):
+          if self.fields.has_key(fieldtype):
+	    return self.fields[fieldtype]
+	  else:
+	    f = fieldtype()
+	    self.fields[fieldtype] = f
+	    return f
+      def all(self):
+          return self.fields.values()
+
+class MagicParticle(Actor):
+      const_speed  = 1.0
+      anim_speed   = 3.0
+      hover_height = 25.0
+      def __init__(self, pos):
+	  Actor.__init__(self, pos)
+	  self.img_list = sprites.get(self.sprite_name)
+	  self.field    = fields.get(self.fieldtype)
+	  self.pos      = pos
+	  self.dev      = 5.0
+	  self.mult     = 10.0
+	  self.decay    = 1.0
+	  self.field.add_particle(self)
+
+      def destroy(self):
+          self.field.del_particle(self)
+	  actors.pop(actors.index(self))
+
+      def release(self):
+          self.decay = 0.98
+
+      # particle params (normal distribution)
+      def get_params(self):
+          return self.pos, self.dev, self.mult
+
+      # draw self
+      def draw(self, screen):
+          self.draw_symmetrical(screen)
+
+      def update(self):
+          Actor.update(self)
+	  self.mult *= self.decay
+	  if self.mult < 0.1:
+	    self.destroy()
+
+class FireField(MagicField):
+      color = (255, 0, 0)
+class IceField(MagicField):
+      color = (0, 128, 255)
+class OilField(MagicField):
+      color = (32, 32, 48)
+      def v(self, pos):
+          return 1.0 + self.particle_values(pos) + 0.01 * random()
+
+class FireBall(MagicParticle):
+      sprite_name = "fireball"
+      fieldtype   = FireField
+
+class Tree:
+      def __init__(self, pos):
+          self.pos   = pos
+          self.image = sprites.get("tree1")[0]
+
+      def draw(self, screen):
+          screen.blit(self.image, [view.pl2sc_x(self.pos) - self.image.get_width() / 2, 200 - self.image.get_height()])
+
+class Dude(Actor):
+      """
+      Magic-using habitant
+      """
+      magic_distance = 5.0
+      const_speed    = 0.4
+      def __init__(self, pos):
+	  Actor.__init__(self, pos)
+          # load images
+	  self.img_left  = sprites.get("dude-left")
+	  self.img_right = sprites.get("dude-right")
+	  self.current_image_index = 0
+	  self.image_count         = len(self.img_left)
+
+	  # character params
+	  self.magic = False
+
+      def magic_start(self):
+          self.magic = FireBall(self.pos + self.direction * self.magic_distance)
+	  return self.magic
+      def magic_release(self):
+	  self.magic.release()
+          self.magic = False
+      def magic_move_right(self):
+          if self.magic:
+	    self.magic.move_right()
+      def magic_move_left(self):
+          if self.magic:
+	    self.magic.move_left()
+
+      def draw(self, screen):
+          self.draw_directed(screen)
+
+class Rabbit(Actor):
+      const_speed = 0.5
+      anim_speed  = 2.0
+      def __init__(self, pos):
+          Actor.__init__(self, pos)
+          # load images
+	  self.img_left  = sprites.get("rabbit-left")
+	  self.img_right = sprites.get("rabbit-right")
+	  self.current_image_index = 0
+	  self.image_count         = len(self.img_left)
+
+      def update(self):
+          Actor.update(self)
+	  if random() < 0.1:
+	    decision = int(random() * 3) % 3
+	    if decision == 0:
+	      self.move_left()
+	    elif decision == 1:
+	      self.move_right()
+	    else:
+	      self.stop()
+
+      def draw(self, screen):
+          self.draw_directed(screen)
+
+pygame.init()
+pygame.display.set_caption('Magic')
+screensize = (1000, 200)
+
+screen  = pygame.display.set_mode(screensize)
+clock   = pygame.time.Clock()
+
+global sprites, view, actors
+sprites = SpriteLoader()
+sprites.load("fire.png", "fireball", 25)
+sprites.load("dude.png", "dude-left", 25, 0, 3)
+sprites.load("dude.png", "dude-right", 25, 3, 6)
+sprites.load("tree1.png", "tree1")
+sprites.load("rabbit.png", "rabbit-right", 25, 0, 3)
+sprites.load("rabbit.png", "rabbit-left", 25, 3, 6)
+
+view    = View(screensize, (0, 0, 100, 2))
+tree    = Tree(50)
+scenery = [tree]
+dude    = Dude(10)
+actors  = [dude]
+for i in xrange(10):
+  rabbit = Rabbit(100 * random())
+  actors.append(rabbit)
+
+fields = MagicFields()
+
+forever    = True
+lasttime   = int(time.time())
+frames     = 0
+lastframes = 0
+while forever:
+  # center view to dude
+  diff = dude.pos - view.get_center_x()
+  if 30.0 > abs(diff) > 5.0:
+    view.move_x(diff * 0.005)
+  elif abs(diff) > 30.0:
+    view.move_x(diff * 0.01)
+
+  # draw
+  screen.fill([0, 0, 192 + math.sin(time.time()) * 32])
+  for obj in scenery:
+    obj.draw(screen)
+  for field in fields.all():
+    field.draw(screen)
+  for actor in actors:
+    actor.draw(screen)
+  
+  pygame.display.update()
+
+  # handle events
+  for event in pygame.event.get():
+    if event.type == pygame.QUIT:
+      forever = False
+    if event.type == pygame.KEYDOWN:
+      if event.key == pygame.K_ESCAPE:
+        forever = False
+      
+      elif event.key == pygame.K_LEFT:
+        dude.move_left()
+      elif event.key == pygame.K_RIGHT:
+        dude.move_right()
+
+      elif event.key == pygame.K_z:
+        fields.get(FireField).toggle_visibility()
+      elif event.key == pygame.K_x:
+        fields.get(IceField).toggle_visibility()
+      elif event.key == pygame.K_c:
+        fields.get(OilField).toggle_visibility()
+
+      elif event.key == pygame.K_SPACE:
+        dude.stop()
+        actors.append(dude.magic_start())
+      elif event.key == pygame.K_a:
+        dude.magic_move_left()
+      elif event.key == pygame.K_d:
+        dude.magic_move_right()
+
+    if event.type == pygame.KEYUP:
+      dude.stop()
+      if event.key == pygame.K_SPACE:
+        dude.magic_release()
+
+  for actor in actors:
+    actor.update()
+
+  # calibration
+  clock.tick(30)
+  frames += 1
+  if int(time.time()) != lasttime:
+    print "FPS: %f" % (frames - lastframes)
+    lasttime   = int(time.time())
+    lastframes = frames
+
+
