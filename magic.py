@@ -93,12 +93,16 @@ class View:
           return (self.offset_y - y) / self.mult_y
 
 class Actor:
+      # misc conf
       const_speed    = 0.0
       const_accel    = 0.0
       magic_distance = 5.0
+      initial_health = 100
 
+      # animation conf
       anim_speed   = 1.0
       hover_height = 0.0
+      directed     = True
       def __init__(self, pos):
           # movement params
           self.speed  = 0.0
@@ -109,6 +113,21 @@ class Actor:
 	  self.direction = -1
 	  self.moving    = False
 
+	  # character params
+	  self.magic = False
+	  self.hp    = self.initial_health
+
+	  # load images
+	  if self.directed:
+	    self.img_left  = sprites.get(self.sprite_names[0])
+	    self.img_right = sprites.get(self.sprite_names[1])
+	    self.image_count         = len(self.img_left)
+	  else:
+	    self.img_list  = sprites.get(self.sprite_names[0])
+	    self.image_count         = len(self.img_list)
+	  self.current_image_index = 0
+
+      # moving the actor
       def move_left(self):
           if not self.const_accel:
             self.speed   = -self.const_speed
@@ -130,41 +149,60 @@ class Actor:
 	    self.accel   = 0
 	  self.moving    = False
 
+      # doing magic
+      def magic_start(self, particle):
+          if self.magic:
+	    self.magic.release()
+          self.magic = particle(self.pos + self.direction * self.magic_distance)
+	  return self.magic
+      def magic_release(self):
+          if self.magic:
+	    self.magic.release()
+            self.magic = False
+      def magic_move_right(self):
+          if self.magic:
+	    self.magic.move_right()
+      def magic_move_left(self):
+          if self.magic:
+	    self.magic.move_left()
+      def magic_stop(self):
+          if self.magic:
+	    self.magic.stop()
+
+      # called every frame
       def update(self):
           if self.accel:
 	    self.speed += self.accel
           if self.speed:
             self.pos  += self.speed * fields.get(OilField).v(self.pos)
       
-      # draw image list in same direction
-      def draw_symmetrical(self, screen):
-	  imgs = len(self.img_list)
-	  imgnum = int(time.time() * imgs * self.anim_speed) % imgs
-	  img = self.img_list[imgnum]
-	  # draw the actor hovering in air
-	  if self.hover_height:
-	    hover = self.hover_height + self.hover_height * math.sin(time.time() * 2) * 0.3
+      # draw image, either left-right directed or unidirectional
+      def draw(self, screen):
+	  # facing direction
+          if self.directed:
+            if self.direction > 0:
+	      imglist = self.img_right
+	    else:
+	      imglist = self.img_left
+	  # unidirectional
 	  else:
-	    hover = 0.0
-	  coords = (view.pl2sc_x(self.pos) - img.get_width() / 2, 200 - img.get_height() - hover)
-          screen.blit(img, coords)
+	    imglist = self.img_list
 
-      def draw_directed(self, screen):
-          # motion images
+          # to animate or not to animate
 	  if self.moving:
 	    self.current_image_index = int(time.time() * self.image_count * self.anim_speed) % self.image_count
 	  else:
 	    self.current_image_index = 0
 
-	  # facing direction
-          if self.direction > 0:
-	    imglist = self.img_right
+	  # hovering in air (particles)
+	  if self.hover_height:
+	    hover = self.hover_height + self.hover_height * math.sin(time.time() * 2) * 0.3
 	  else:
-	    imglist = self.img_left
-	  img = imglist[self.current_image_index]
+	    hover = 0.0
 
-	  # actually draw self
-	  coords = (view.pl2sc_x(self.pos) - img.get_width() / 2 , 200 - img.get_height() - self.hover_height)
+          # actual drawing
+	  img = imglist[self.current_image_index]
+	  coords = (view.pl2sc_x(self.pos) - img.get_width() / 2, 200 - img.get_height() - hover)
           screen.blit(img, coords)
 
 class MagicField:
@@ -233,11 +271,10 @@ class MagicParticle(Actor):
       const_accel  = 0.02
       anim_speed   = 3.0
       hover_height = 25.0
+      directed     = False
       def __init__(self, pos):
 	  Actor.__init__(self, pos)
-	  self.img_list = sprites.get(self.sprite_name)
 	  self.field    = fields.get(self.fieldtype)
-	  self.pos      = pos
 	  self.dev      = 5.0
 	  self.mult     = 10.0
 	  self.decay    = 1.0
@@ -253,10 +290,6 @@ class MagicParticle(Actor):
       # particle params (normal distribution)
       def get_params(self):
           return self.pos, self.dev, self.mult
-
-      # draw self
-      def draw(self, screen):
-          self.draw_symmetrical(screen)
 
       def update(self):
           Actor.update(self)
@@ -274,14 +307,14 @@ class OilField(MagicField):
           return 1.0 + self.particle_values(pos) + 0.01 * random()
 
 class FireBall(MagicParticle):
-      sprite_name = "fireball"
-      fieldtype   = FireField
+      sprite_names = ["fireball"]
+      fieldtype    = FireField
 class IceBall(MagicParticle):
-      sprite_name = "iceball"
-      fieldtype   = IceField
+      sprite_names = ["iceball"]
+      fieldtype    = IceField
 class OilBall(MagicParticle):
-      sprite_name = "oilball"
-      fieldtype   = OilField
+      sprite_names = ["oilball"]
+      fieldtype    = OilField
 
 class Tree:
       def __init__(self, pos):
@@ -295,52 +328,14 @@ class Dude(Actor):
       """
       Magic-using habitant
       """
-      const_speed = 0.4
-      def __init__(self, pos):
-	  Actor.__init__(self, pos)
-          # load images
-	  self.img_left  = sprites.get("dude-left")
-	  self.img_right = sprites.get("dude-right")
-	  self.current_image_index = 0
-	  self.image_count         = len(self.img_left)
-	  self.fire = fields.get(FireField)
+      const_speed  = 0.4
+      sprite_names = ["dude-left", "dude-right"]
 
-	  # character params
-	  self.hp    = 100
-	  self.magic = False
-
-      def magic_start(self, particle):
-          if self.magic:
-	    self.magic.release()
-          self.magic = particle(self.pos + self.direction * self.magic_distance)
-	  return self.magic
-      def magic_release(self):
-          if self.magic:
-	    self.magic.release()
-            self.magic = False
-      def magic_move_right(self):
-          if self.magic:
-	    self.magic.move_right()
-      def magic_move_left(self):
-          if self.magic:
-	    self.magic.move_left()
-      def magic_stop(self):
-          if self.magic:
-	    self.magic.stop()
-
-      def draw(self, screen):
-          self.draw_directed(screen)
 
 class Rabbit(Actor):
-      const_speed = 0.5
-      anim_speed  = 2.0
-      def __init__(self, pos):
-          Actor.__init__(self, pos)
-          # load images
-	  self.img_left  = sprites.get("rabbit-left")
-	  self.img_right = sprites.get("rabbit-right")
-	  self.current_image_index = 0
-	  self.image_count         = len(self.img_left)
+      const_speed  = 0.5
+      anim_speed   = 2.0
+      sprite_names = ["rabbit-left", "rabbit-right"]
 
       def update(self):
           Actor.update(self)
@@ -353,24 +348,18 @@ class Rabbit(Actor):
 	    else:
 	      self.stop()
 
-      def draw(self, screen):
-          self.draw_directed(screen)
-
 class Dragon(Actor):
-      const_speed = 0.1
+      const_speed  = 0.1
+      sprite_names = ["dragon-left", "dragon-right"]
       def __init__(self, pos):
           Actor.__init__(self, pos)
-	  self.img_left  = sprites.get("dragon-left")
-	  self.img_right = sprites.get("dragon-right")
-	  self.current_image_index = 0
-	  self.image_count         = len(self.img_left)
 	  self.dev   = 1.0
 	  self.mult  = 2.0
 	  fields.get(FireField).add_particle(self)
 
       def update(self):
           Actor.update(self)
-	  if random() < 0.02:
+	  if random() < 0.01:
 	    decision = int(random() * 3) % 3
 	    if decision == 0:
 	      self.move_left()
@@ -378,9 +367,6 @@ class Dragon(Actor):
 	      self.move_right()
 	    else:
 	      self.stop()
-
-      def draw(self, screen):
-          self.draw_directed(screen)
 
       # particle params (normal distribution)
       def get_params(self):
