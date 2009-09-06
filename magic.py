@@ -274,10 +274,10 @@ class MagicParticle(Actor):
       directed     = False
       def __init__(self, pos):
 	  Actor.__init__(self, pos)
-	  self.field    = fields.get(self.fieldtype)
-	  self.dev      = 5.0
-	  self.mult     = 10.0
-	  self.decay    = 1.0
+	  self.field  = fields.get(self.fieldtype)
+	  self.dev    = 5.0
+	  self.mult   = 10.0
+	  self.decay  = 1.0
 	  self.field.add_particle(self)
 
       def destroy(self):
@@ -292,6 +292,7 @@ class MagicParticle(Actor):
           return self.pos, self.dev, self.mult
 
       def update(self):
+	  self.moving = True
           Actor.update(self)
 	  self.mult *= self.decay
 	  if self.mult < 0.1:
@@ -359,14 +360,24 @@ class Dragon(Actor):
 
       def update(self):
           Actor.update(self)
-	  if random() < 0.01:
+	  if random() < 0.03:
 	    decision = int(random() * 3) % 3
-	    if decision == 0:
-	      self.move_left()
-	    elif decision == 1:
-	      self.move_right()
-	    else:
-	      self.stop()
+	    if not self.magic:
+	      if decision == 0:
+	        self.move_left()
+	      elif decision == 1:
+	        self.move_right()
+	      elif decision == 2:
+	        self.stop()
+	        actors.append(self.magic_start(FireBall))
+            else:
+	      if decision == 0:
+	        self.magic_move_left()
+	      elif decision == 1:
+	        self.magic_move_right()
+	      else:
+	        self.magic_stop()
+	        self.magic_release()
 
       # particle params (normal distribution)
       def get_params(self):
