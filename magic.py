@@ -20,7 +20,7 @@ class SpriteLoader:
           self.lists  = {}
 	  self.images = {}
 
-      def load(self, filename, listname = False, width = False, start = 0, to = False):
+      def load(self, filename, listname = False, width = False, start = 0, to = False, flip = False):
           # load the file, if not already loaded
           if not self.images.has_key(filename):
 	    self.images[filename] = pygame.image.load("img/" + filename)
@@ -29,6 +29,8 @@ class SpriteLoader:
           # make an image list as well?
           if listname:
 	    if not width:
+	      if flip:
+	        img = pygame.transform.flip(img, True, False)
 	      self.lists[listname] = [img]
 	    else:
 	      # use all subsurfaces?
@@ -37,7 +39,10 @@ class SpriteLoader:
 	      self.lists[listname] = []
 	      for i in xrange(start, to):
 	        rect = [ i * width, 0, width, img.get_height() ]
-	        self.lists[listname].append(img.subsurface(rect))
+		subimg = img.subsurface(rect)
+		if flip:
+		  subimg = pygame.transform.flip(subimg, True, False)
+	        self.lists[listname].append(subimg)
 
       def get(self, name):
           if name in self.images.keys():
@@ -88,13 +93,16 @@ class View:
           return (self.offset_y - y) / self.mult_y
 
 class Actor:
-      const_speed  = 0.0
+      const_speed    = 0.0
+      const_accel    = 0.0
+      magic_distance = 5.0
 
       anim_speed   = 1.0
       hover_height = 0.0
       def __init__(self, pos):
           # movement params
-          self.speed  = 0
+          self.speed  = 0.0
+	  self.accel  = 0.0
 	  self.pos    = pos
 
 	  # animation params
@@ -102,18 +110,29 @@ class Actor:
 	  self.moving    = False
 
       def move_left(self):
-          self.speed     = -self.const_speed
+          if not self.const_accel:
+            self.speed   = -self.const_speed
+	  else:
+	    self.accel   = -self.const_accel
 	  self.moving    = True
 	  self.direction = -1
       def move_right(self):
-	  self.speed = self.const_speed
+          if not self.const_accel:
+	    self.speed   = self.const_speed
+	  else:
+	    self.accel   = self.const_accel
 	  self.moving    = True
 	  self.direction = 1
       def stop(self):
-          self.speed     = 0
+          if not self.const_accel:
+            self.speed   = 0
+	  else:
+	    self.accel   = 0
 	  self.moving    = False
 
       def update(self):
+          if self.accel:
+	    self.speed += self.accel
           if self.speed:
             self.pos  += self.speed * fields.get(OilField).v(self.pos)
       
@@ -194,11 +213,10 @@ class MagicField:
               pygame.draw.line(screen, self.color, self.sc_value(pos * step), self.sc_value((pos + 1) * step))
 
 class MagicFields:
-      def __init__(self):
+      def __init__(self, fieldtypes):
           self.fields = { }
-	  self.get(FireField)
-	  self.get(IceField)
-	  self.get(OilField)
+	  for fieldtype in fieldtypes:
+	    self.get(fieldtype)
 
       # Class method, store different fields in class and return them
       def get(self, fieldtype):
@@ -212,7 +230,7 @@ class MagicFields:
           return self.fields.values()
 
 class MagicParticle(Actor):
-      const_speed  = 1.0
+      const_accel  = 0.02
       anim_speed   = 3.0
       hover_height = 25.0
       def __init__(self, pos):
@@ -230,7 +248,7 @@ class MagicParticle(Actor):
 	  actors.pop(actors.index(self))
 
       def release(self):
-          self.decay = 0.98
+          self.decay = 0.995
 
       # particle params (normal distribution)
       def get_params(self):
@@ -258,6 +276,12 @@ class OilField(MagicField):
 class FireBall(MagicParticle):
       sprite_name = "fireball"
       fieldtype   = FireField
+class IceBall(MagicParticle):
+      sprite_name = "iceball"
+      fieldtype   = IceField
+class OilBall(MagicParticle):
+      sprite_name = "oilball"
+      fieldtype   = OilField
 
 class Tree:
       def __init__(self, pos):
@@ -271,8 +295,7 @@ class Dude(Actor):
       """
       Magic-using habitant
       """
-      magic_distance = 5.0
-      const_speed    = 0.4
+      const_speed = 0.4
       def __init__(self, pos):
 	  Actor.__init__(self, pos)
           # load images
@@ -280,22 +303,30 @@ class Dude(Actor):
 	  self.img_right = sprites.get("dude-right")
 	  self.current_image_index = 0
 	  self.image_count         = len(self.img_left)
+	  self.fire = fields.get(FireField)
 
 	  # character params
+	  self.hp    = 100
 	  self.magic = False
 
-      def magic_start(self):
-          self.magic = FireBall(self.pos + self.direction * self.magic_distance)
+      def magic_start(self, particle):
+          if self.magic:
+	    self.magic.release()
+          self.magic = particle(self.pos + self.direction * self.magic_distance)
 	  return self.magic
       def magic_release(self):
-	  self.magic.release()
-          self.magic = False
+          if self.magic:
+	    self.magic.release()
+            self.magic = False
       def magic_move_right(self):
           if self.magic:
 	    self.magic.move_right()
       def magic_move_left(self):
           if self.magic:
 	    self.magic.move_left()
+      def magic_stop(self):
+          if self.magic:
+	    self.magic.stop()
 
       def draw(self, screen):
           self.draw_directed(screen)
@@ -313,7 +344,7 @@ class Rabbit(Actor):
 
       def update(self):
           Actor.update(self)
-	  if random() < 0.1:
+	  if random() < 0.05:
 	    decision = int(random() * 3) % 3
 	    if decision == 0:
 	      self.move_left()
@@ -325,6 +356,37 @@ class Rabbit(Actor):
       def draw(self, screen):
           self.draw_directed(screen)
 
+class Dragon(Actor):
+      const_speed = 0.1
+      def __init__(self, pos):
+          Actor.__init__(self, pos)
+	  self.img_left  = sprites.get("dragon-left")
+	  self.img_right = sprites.get("dragon-right")
+	  self.current_image_index = 0
+	  self.image_count         = len(self.img_left)
+	  self.dev   = 1.0
+	  self.mult  = 2.0
+	  fields.get(FireField).add_particle(self)
+
+      def update(self):
+          Actor.update(self)
+	  if random() < 0.02:
+	    decision = int(random() * 3) % 3
+	    if decision == 0:
+	      self.move_left()
+	    elif decision == 1:
+	      self.move_right()
+	    else:
+	      self.stop()
+
+      def draw(self, screen):
+          self.draw_directed(screen)
+
+      # particle params (normal distribution)
+      def get_params(self):
+          return self.pos, self.dev, self.mult
+
+
 pygame.init()
 pygame.display.set_caption('Magic')
 screensize = (1000, 200)
@@ -332,30 +394,40 @@ screensize = (1000, 200)
 screen  = pygame.display.set_mode(screensize)
 clock   = pygame.time.Clock()
 
-global sprites, view, actors
+global sprites, view, actors, fields
 sprites = SpriteLoader()
 sprites.load("fire.png", "fireball", 25)
-sprites.load("dude.png", "dude-left", 25, 0, 3)
-sprites.load("dude.png", "dude-right", 25, 3, 6)
+sprites.load("ice.png", "iceball", 25)
+sprites.load("oil.png", "oilball", 25)
+sprites.load("dude.png", "dude-right", 25)
+sprites.load("dude.png", "dude-left", 25, flip = True)
+sprites.load("rabbit.png", "rabbit-right", 25)
+sprites.load("rabbit.png", "rabbit-left", 25, flip = True)
+sprites.load("dragon.png", "dragon-right", 25)
+sprites.load("dragon.png", "dragon-left", 25, flip = True)
 sprites.load("tree1.png", "tree1")
-sprites.load("rabbit.png", "rabbit-right", 25, 0, 3)
-sprites.load("rabbit.png", "rabbit-left", 25, 3, 6)
+sprites.load("grass.png", "grass")
 
 view    = View(screensize, (0, 0, 100, 2))
+fields  = MagicFields([FireField, IceField, OilField])
 tree    = Tree(50)
 scenery = [tree]
 dude    = Dude(10)
-actors  = [dude]
+dragon  = Dragon(70)
+actors  = [dude, dragon]
 for i in xrange(10):
   rabbit = Rabbit(100 * random())
   actors.append(rabbit)
 
-fields = MagicFields()
 
+# loop
 forever    = True
+# calibration
 lasttime   = int(time.time())
 frames     = 0
 lastframes = 0
+# state
+casting    = False
 while forever:
   # center view to dude
   diff = dude.pos - view.get_center_x()
@@ -365,54 +437,87 @@ while forever:
     view.move_x(diff * 0.01)
 
   # draw
-  screen.fill([0, 0, 192 + math.sin(time.time()) * 32])
+  day = math.sin(time.time()) + 1
+  screen.fill([day * 32, 64 + day * 32, 192 + day * 32])
   for obj in scenery:
     obj.draw(screen)
   for field in fields.all():
     field.draw(screen)
   for actor in actors:
     actor.draw(screen)
-  
+  grass = sprites.get("grass")[0]
+  w = grass.get_width()
+  for i in xrange(view.pl2sc_x(200) / w):
+    screen.blit(grass, [view.pl2sc_x(0 - 100) + i * w, 200 - grass.get_height() + 5])
   pygame.display.update()
 
   # handle events
   for event in pygame.event.get():
     if event.type == pygame.QUIT:
       forever = False
+    
+    # key events
     if event.type == pygame.KEYDOWN:
       if event.key == pygame.K_ESCAPE:
         forever = False
-      
+
       elif event.key == pygame.K_LEFT:
-        dude.move_left()
+        if not casting:
+          dude.move_left()
       elif event.key == pygame.K_RIGHT:
-        dude.move_right()
+        if not casting:
+          dude.move_right()
 
+      elif event.key == pygame.K_LSHIFT:
+        casting = True
+      
       elif event.key == pygame.K_z:
-        fields.get(FireField).toggle_visibility()
+        if casting:
+          dude.stop()
+          actors.append(dude.magic_start(FireBall))
+          fields.get(FireField).toggle_visibility(True)
+	else:
+          fields.get(FireField).toggle_visibility()
       elif event.key == pygame.K_x:
-        fields.get(IceField).toggle_visibility()
+        if casting:
+          dude.stop()
+          actors.append(dude.magic_start(IceBall))
+          fields.get(IceField).toggle_visibility(True)
+	else:
+          fields.get(IceField).toggle_visibility()
       elif event.key == pygame.K_c:
-        fields.get(OilField).toggle_visibility()
+        if casting:
+          dude.stop()
+          actors.append(dude.magic_start(OilBall))
+          fields.get(OilField).toggle_visibility(True)
+	else:
+          fields.get(OilField).toggle_visibility()
 
-      elif event.key == pygame.K_SPACE:
-        dude.stop()
-        actors.append(dude.magic_start())
       elif event.key == pygame.K_a:
         dude.magic_move_left()
       elif event.key == pygame.K_d:
         dude.magic_move_right()
 
     if event.type == pygame.KEYUP:
-      dude.stop()
-      if event.key == pygame.K_SPACE:
+      if event.key == pygame.K_LSHIFT:
         dude.magic_release()
+        casting = False
+      elif event.key == pygame.K_LEFT:
+        dude.stop()
+      elif event.key == pygame.K_RIGHT:
+        dude.stop()
 
+      elif event.key == pygame.K_a:
+        dude.magic_stop()
+      elif event.key == pygame.K_d:
+        dude.magic_stop()
+
+  # actors moving
   for actor in actors:
     actor.update()
 
   # calibration
-  clock.tick(30)
+  clock.tick(45)
   frames += 1
   if int(time.time()) != lasttime:
     print "FPS: %f" % (frames - lastframes)
