@@ -394,12 +394,21 @@ class Dragon(Actor):
 class FSMController:
       states = [ "idle" ]
       start_state = "idle"
+
+      class InvalidState(Exception):
+            def __init__(self, state):
+                self.state = state
+            def __str__(self):
+                return "Invalid state change to: %s" % (self.state)
+
       def __init__(self, puppet):
           self.puppet  = puppet
           self.last_hp = puppet.hp
           self.switch(self.start_state)
 
       def switch(self, newstate):
+          if not newstate in self.states:
+            raise self.InvalidState(newstate)
           self.state       = newstate
           self.switch_time = time.time()
 
@@ -448,35 +457,54 @@ class RabbitController(FSMController):
 
 
 class DragonController(FSMController):
+      states = [ "idle", "follow", "shoot" ]
+      def state_change(self):
+          closest = 100
+          for actor in self.puppet.world.all_actors():
+            distance = abs(actor.pos - self.puppet.pos)
+            if distance < closest and actor != self.puppet and actor.__class__ != FireBall:
+              closest = distance
+              target  = actor
+          self.target  = target
+
+          # shoot will end by itself
+          if self.state != "shoot":
+            if closest > 50:
+              self.switch("idle")
+            elif closest > 25:
+              self.switch("follow")
+            elif self.state_time() > 1.5:
+              self.switch("shoot")
+
       def state_action(self):
-          if random() < 0.05:
-            closest = 100
-            for actor in self.puppet.world.all_actors():
-              if abs(actor.pos - self.puppet.pos) < abs(closest) and actor != self.puppet:
-                closest = actor.pos
-            if abs(closest) < 10:
-              parts = 5
-            else:
-              parts = 3
-              
-            decision = int(random() * parts) % parts
-            if not self.puppet.magic:
+          if self.state == "idle":
+            if random() < 0.05:
+              decision = int(random() * 3) % 3
               if decision == 0:
                 self.puppet.move_left()
               elif decision == 1:
                 self.puppet.move_right()
               elif decision == 2:
                 self.puppet.stop()
-                self.puppet.world.add_actor(self.puppet.magic_start(FireBall))
-            else:
-              if decision == 0:
+          elif self.state == "follow":
+            pass
+          elif self.state == "shoot":
+            if not self.puppet.magic:
+              self.puppet.world.add_actor(self.puppet.magic_start(FireBall))
+              if self.target.pos > self.puppet.pos:
+                self.puppet.magic_move_right()
+              else:
+                self.puppet.magic_move_left()
+            if self.target.pos > self.puppet.pos:
+              if self.puppet.magic.pos > self.target.pos:
                 self.puppet.magic_stop()
                 self.puppet.magic_release()
-              else:
-                if closest > 0:
-                  self.puppet.magic_move_right()
-                else:
-                  self.puppet.magic_move_left()
+                self.switch("idle")
+            else:
+              if self.puppet.magic.pos < self.target.pos:
+                self.puppet.magic_stop()
+                self.puppet.magic_release()
+                self.switch("idle")
 
 class ControlledDragon(Dragon):
       control = DragonController
