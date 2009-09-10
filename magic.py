@@ -125,6 +125,8 @@ class Actor:
       const_accel    = 0.0
       magic_distance = 5.0
       initial_hp     = 100
+      regeneration   = 0.01
+      control        = None
 
       # animation conf
       anim_speed   = 1.0
@@ -154,6 +156,12 @@ class Actor:
             self.img_list    = world.sprites.get(self.sprite_names[0])
             self.image_count = len(self.img_list)
           self.current_image_index = 0
+
+          # controller init
+          if self.control:
+            self.controller = self.control(self)
+          else:
+            self.controller = None
 
       # moving the actor
       def move_left(self):
@@ -203,15 +211,19 @@ class Actor:
             self.speed += self.accel
           if self.speed:
             self.pos  += self.speed * self.world.get_field(OilField).v(self.pos)
+          # effects of magic
           self.update_hp()
-          if self.hp <= 0:
+          # death
+          if self.hp <= 0 and self.initial_hp:
             self.world.del_actor(self)
           # controlled actors
-          self.control()
+          if self.controller:
+            self.controller.update()
+      # different Actors can implement their own way of changing their hp
       def update_hp(self):
           self.hp -= self.world.fields.get(FireField).v(self.pos) / 2.0
-      def control(self):
-          pass
+          if self.hp < self.initial_hp:
+            self.hp += self.regeneration
       
       # draw image, either left-right directed or unidirectional
       def draw(self, view, screen, draw_hp = False):
@@ -243,7 +255,7 @@ class Actor:
           screen.blit(img, coords)
 
           # draw hp bar
-          if draw_hp:
+          if draw_hp and self.initial_hp:
             hpcolor = (64, 255, 64)
             border  = (view.pl2sc_x(self.pos), 200 - img.get_height() - hover, 30, 3)
             fill    = (view.pl2sc_x(self.pos), 200 - img.get_height() - hover, 30 * (self.hp / self.initial_hp), 3)
@@ -300,6 +312,7 @@ class MagicParticle(Actor):
       const_accel  = 0.02
       anim_speed   = 3.0
       hover_height = 25.0
+      initial_hp   = 0
       directed     = False
       def __init__(self, world, pos):
           Actor.__init__(self, world, pos)
@@ -351,6 +364,7 @@ class OilBall(MagicParticle):
 class Tree(Actor):
       sprite_names = ["tree"]
       directed     = False
+      initial_hp   = 0
 
 class Dude(Actor):
       const_speed  = 0.4
@@ -377,37 +391,97 @@ class Dragon(Actor):
       def update_hp(self):
           self.hp -= self.world.fields.get(IceField).v(self.pos) / 2.0
 
-class ControlledRabbit(Rabbit):
-      def control(self):
-          if random() < 0.05:
-            decision = int(random() * 3) % 3
-            if decision == 0:
-              self.move_left()
-            elif decision == 1:
-              self.move_right()
+class FSMController:
+      states = [ "idle" ]
+      start_state = "idle"
+      def __init__(self, puppet):
+          self.puppet  = puppet
+          self.last_hp = puppet.hp
+          self.switch(self.start_state)
+
+      def switch(self, newstate):
+          self.state       = newstate
+          self.switch_time = time.time()
+
+      def state_time(self):
+          return time.time() - self.switch_time
+
+      def update(self):
+          self.state_change()
+          self.last_hp = self.puppet.hp
+          self.state_action()
+      def state_change(self):
+          pass
+      def state_action(self):
+          pass
+
+class RabbitController(FSMController):
+      states = [ "idle", "jolt", "flee" ]
+      def state_change(self):
+          if self.state == "jolt":
+            self.switch("flee")
+          if self.last_hp * 0.999 > self.puppet.hp and not self.state == "flee":
+            self.switch("jolt")
+          elif self.state_time() > 2.0:
+            self.switch("idle")
+
+      def state_action(self):
+          if self.state == "idle":
+            # move around randomly
+            if random() < 0.05:
+              decision = int(random() * 3) % 3
+              if decision == 0:
+                self.puppet.move_left()
+              elif decision == 1:
+                self.puppet.move_right()
+              else:
+                self.puppet.stop()
+          elif self.state == "jolt":
+            # reverse direction and start moving away from danger
+            if self.puppet.direction > 0:
+              self.puppet.move_left()
             else:
-              self.stop()
+              self.puppet.move_right()
+          elif self.state == "flee":
+            # continue the jolting direction
+            pass
+
+
+class DragonController(FSMController):
+      def state_action(self):
+          if random() < 0.05:
+            closest = 100
+            for actor in self.puppet.world.all_actors():
+              if abs(actor.pos - self.puppet.pos) < abs(closest) and actor != self.puppet:
+                closest = actor.pos
+            if abs(closest) < 10:
+              parts = 5
+            else:
+              parts = 3
+              
+            decision = int(random() * parts) % parts
+            if not self.puppet.magic:
+              if decision == 0:
+                self.puppet.move_left()
+              elif decision == 1:
+                self.puppet.move_right()
+              elif decision == 2:
+                self.puppet.stop()
+                self.puppet.world.add_actor(self.puppet.magic_start(FireBall))
+            else:
+              if decision == 0:
+                self.puppet.magic_stop()
+                self.puppet.magic_release()
+              else:
+                if closest > 0:
+                  self.puppet.magic_move_right()
+                else:
+                  self.puppet.magic_move_left()
 
 class ControlledDragon(Dragon):
-      def control(self):
-          if random() < 0.03:
-            decision = int(random() * 3) % 3
-            if not self.magic:
-              if decision == 0:
-                self.move_left()
-              elif decision == 1:
-                self.move_right()
-              elif decision == 2:
-                self.stop()
-                self.world.add_actor(self.magic_start(FireBall))
-            else:
-              if decision == 0:
-                self.magic_move_left()
-              elif decision == 1:
-                self.magic_move_right()
-              else:
-                self.magic_stop()
-                self.magic_release()
+      control = DragonController
+class ControlledRabbit(Rabbit):
+      control = RabbitController
 
 class Game:
       def __init__(self):
