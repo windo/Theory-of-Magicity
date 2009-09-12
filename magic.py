@@ -697,6 +697,9 @@ class Game:
                 ball_txt = world.font.render("%u: %s" % (i, str(ball)), False, ball.field.color)
                 screen.blit(ball_txt, (10, 40 + i * 10))
                 i += 1
+            # draw dude's magic
+            if casting and get_magic and dude.magic:
+              pygame.draw.circle(screen, (255, 255, 255), (view.pl2sc_x(dude.magic.pos), view.sc_h() - 40), 25, 1)
             pygame.display.update()
           
             # handle events
@@ -709,13 +712,19 @@ class Game:
                 if event.key == pygame.K_ESCAPE:
                   forever = False
           
+                # dude moving
                 elif event.key == pygame.K_LEFT:
-                  if not casting:
-                    dude.move_left()
+                  dude.move_left()
                 elif event.key == pygame.K_RIGHT:
-                  if not casting:
-                    dude.move_right()
+                  dude.move_right()
           
+                # magic moving
+                elif event.key == pygame.K_a:
+                  dude.magic_move_left()
+                elif event.key == pygame.K_d:
+                  dude.magic_move_right()
+
+                # mode switching
                 elif event.key == pygame.K_TAB:
                   draw_hp = not draw_hp
                   draw_debug = not draw_debug
@@ -724,47 +733,35 @@ class Game:
                 elif event.key == pygame.K_LCTRL:
                   get_magic = True
                 
+                # casting & fields
+                elif casting and event.key == pygame.K_z:
+                  world.add_actor(dude.magic_start(FireBall))
                 elif event.key == pygame.K_z:
-                  if casting:
-                    dude.stop()
-                    world.add_actor(dude.magic_start(FireBall))
-                    world.get_field(FireField).toggle_visibility(True)
-                  else:
-                    world.get_field(FireField).toggle_visibility()
+                  world.get_field(FireField).toggle_visibility()
+                elif casting and event.key == pygame.K_x:
+                  world.add_actor(dude.magic_start(IceBall))
                 elif event.key == pygame.K_x:
-                  if casting:
-                    dude.stop()
-                    world.add_actor(dude.magic_start(IceBall))
-                    world.get_field(IceField).toggle_visibility(True)
-                  else:
-                    world.get_field(IceField).toggle_visibility()
+                  world.get_field(IceField).toggle_visibility()
+                elif casting and event.key == pygame.K_c:
+                  world.add_actor(dude.magic_start(OilBall))
                 elif event.key == pygame.K_c:
-                  if casting:
-                    dude.stop()
-                    world.add_actor(dude.magic_start(OilBall))
-                    world.get_field(OilField).toggle_visibility(True)
-                  else:
-                    world.get_field(OilField).toggle_visibility()
+                  world.get_field(OilField).toggle_visibility()
 
-                elif get_magic:
-                  if event.key >= pygame.K_1 and event.key <= pygame.K_9:
-                    idx = event.key - pygame.K_1
-                    if len(local_balls) > idx:
-                      dude.magic_capture(local_balls[idx])
-                      get_magic = False
-                      casting   = True
+                # recapture existing particles
+                elif get_magic and event.key >= pygame.K_1 and event.key <= pygame.K_9:
+                  idx = event.key - pygame.K_1
+                  if len(local_balls) > idx:
+                    dude.magic_capture(local_balls[idx])
+                    casting   = True
           
-                elif event.key == pygame.K_a:
-                  dude.magic_move_left()
-                elif event.key == pygame.K_d:
-                  dude.magic_move_right()
-          
+              # key releases
               if event.type == pygame.KEYUP:
                 if event.key == pygame.K_LSHIFT:
                   dude.magic_release()
                   casting = False
                 if event.key == pygame.K_LCTRL:
                   get_magic = False
+                  casting   = False
                 elif event.key == pygame.K_LEFT:
                   dude.stop()
                 elif event.key == pygame.K_RIGHT:

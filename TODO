@@ -1,4 +1,4 @@
 Stuff to do, in order:
- * Re-control ("catch") particles
- * Particle energy control (hot<->cold)
  * Particle energy consumption from Actor (only support so many particles at once without them dissipating)
+ * Particle energy control (hot<->cold)
+ * speeds and such per time(), not per frame
