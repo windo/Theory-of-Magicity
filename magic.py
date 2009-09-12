@@ -2,6 +2,7 @@
 
 import time, os, sys, math
 from random import random
+from operator import attrgetter
 
 import pygame
 from pygame.locals import *
@@ -76,6 +77,13 @@ class View:
           self.offset_x = plane_x1
           self.offset_y = plane_y2
 
+      def pl_x1(self): return self.plane[0]
+      def pl_x2(self): return self.plane[2]
+      def pl_y1(self): return self.plane[1]
+      def pl_y2(self): return self.plane[3]
+      def sc_w(self): return self.view[0]
+      def sc_h(self): return self.view[1]
+
       def get_center_x(self):
           return self.plane[0] + float(self.plane[2] - self.plane[0]) / 2.0
       def move_x(self, x):
@@ -93,8 +101,10 @@ class View:
           return (self.offset_y - y) / self.mult_y
 
 class World:
-      def __init__(self, sprites, fieldtypes):
+      def __init__(self, sprites, fieldtypes, view):
           self.sprites = sprites
+          self.view    = view
+          self.font    = pygame.font.SysFont("any", 14)
           self.fields  = {}
           for fieldtype in fieldtypes:
             field = fieldtype()
@@ -112,6 +122,22 @@ class World:
           self.actors.pop(self.actors.index(actor))
       def all_actors(self):
           return self.actors
+      def get_actors(self, x1 = False, x2 = False, filter = False):
+          """
+          Get actors with position in range [x1 : x2] and matching filter
+          """
+          ret = []
+          for actor in self.actors:
+            if x1 and actor.pos < x1:
+              continue
+            if x2 and actor.pos > x2:
+              continue
+            if filter and not filter(actor):
+              continue
+            ret.append(actor)
+          return ret
+      def sort_actors(self):
+          self.actors.sort(key = attrgetter("pos"))
 
       # field management
       def get_field(self, fieldtype):
@@ -140,8 +166,9 @@ class Actor:
           self.world = world
 
           # animation params
-          self.direction = -1
-          self.moving    = False
+          self.start_time = time.time()
+          self.direction  = -1
+          self.moving     = False
 
           # character params
           self.magic = False
@@ -149,19 +176,26 @@ class Actor:
 
           # load images
           if self.directed:
-            self.img_left    = world.sprites.get(self.sprite_names[0])
-            self.img_right   = world.sprites.get(self.sprite_names[1])
-            self.image_count = len(self.img_left)
+            self.img_left  = world.sprites.get(self.sprite_names[0])
+            self.img_right = world.sprites.get(self.sprite_names[1])
+            self.img_count = len(self.img_left)
+            self.img_w     = self.img_left[0].get_width()
+            self.img_h     = self.img_left[0].get_height()
           else:
-            self.img_list    = world.sprites.get(self.sprite_names[0])
-            self.image_count = len(self.img_list)
-          self.current_image_index = 0
+            self.img_list  = world.sprites.get(self.sprite_names[0])
+            self.img_count = len(self.img_list)
+            self.img_w     = self.img_list[0].get_width()
+            self.img_h     = self.img_list[0].get_height()
+          self.cur_img_idx = 0
 
           # controller init
           if self.control:
             self.controller = self.control(self)
           else:
             self.controller = None
+
+      def __str__(self):
+          return "%s(0x%s) @ %.1f + %.3f" % (str(self.__class__).split(".")[1], id(self), self.pos, self.speed)
 
       # moving the actor
       def move_left(self):
@@ -226,7 +260,10 @@ class Actor:
             self.hp += self.regeneration
       
       # draw image, either left-right directed or unidirectional
-      def draw(self, view, screen, draw_hp = False):
+      def draw(self, view, screen, draw_hp = False, draw_debug = False):
+          # do not draw off-the screen actors
+          if self.pos + self.img_w < self.world.view.pl_x1() or self.pos - self.img_w > self.world.view.pl_x2():
+            return
           # facing direction
           if self.directed:
             if self.direction > 0:
@@ -239,29 +276,34 @@ class Actor:
 
           # to animate or not to animate
           if self.moving:
-            self.current_image_index = int(time.time() * self.image_count * self.anim_speed) % self.image_count
+            self.cur_img_idx = int(time.time() * self.img_count * self.anim_speed) % self.img_count
           else:
-            self.current_image_index = 0
+            self.cur_img_idx = 0
 
           # hovering in air (particles)
           if self.hover_height:
-            hover = self.hover_height + self.hover_height * math.sin(time.time() * 2) * 0.3
+            hover = self.hover_height + self.hover_height * math.sin((time.time() - self.start_time) * 2) * 0.3
           else:
             hover = 0.0
 
           # actual drawing
-          img = imglist[self.current_image_index]
-          coords = (view.pl2sc_x(self.pos) - img.get_width() / 2, 200 - img.get_height() - hover)
+          img = imglist[self.cur_img_idx]
+          coords = (view.pl2sc_x(self.pos) - self.img_w / 2, view.sc_h() - self.img_h - hover)
           screen.blit(img, coords)
 
           # draw hp bar
           if draw_hp and self.initial_hp:
             hpcolor = (64, 255, 64)
-            border  = (view.pl2sc_x(self.pos), 200 - img.get_height() - hover, 30, 3)
-            fill    = (view.pl2sc_x(self.pos), 200 - img.get_height() - hover, 30 * (self.hp / self.initial_hp), 3)
+            border  = (view.pl2sc_x(self.pos), view.sc_h() - self.img_h - hover, 30, 3)
+            fill    = (view.pl2sc_x(self.pos), view.sc_h() - self.img_h - hover, 30 * (self.hp / self.initial_hp), 3)
             pygame.draw.rect(screen, hpcolor, border, 1)
             pygame.draw.rect(screen, hpcolor, fill, 0)
 
+          if draw_debug:
+            text_self       = self.world.font.render(str(self), False, (255, 255, 255))
+            text_controller = self.world.font.render(str(self.controller), False, (255, 255, 255))
+            screen.blit(text_self,       (view.pl2sc_x(self.pos) - 100, int(draw_debug) + 20))
+            screen.blit(text_controller, (view.pl2sc_x(self.pos) - 100, int(draw_debug) + 30))
 
 class MagicField:
       """
@@ -288,8 +330,10 @@ class MagicField:
       def particle_values(self, pos):
           v = 0.0
           for particle in self.particles:
-            mean, dev, mult = particle.get_params()
-            v += 1 / (dev * math.sqrt(2 * math.pi)) * math.exp((-(pos - mean) ** 2)/(2 * dev ** 2)) * mult
+            # likely not to have any effect farther than that, optimize out
+            if abs(particle.pos - pos) < 25:
+              mean, dev, mult = particle.get_params()
+              v += 1 / (dev * math.sqrt(2 * math.pi)) * math.exp((-(pos - mean) ** 2)/(2 * dev ** 2)) * mult
           return v
 
       # draw the field on screen
@@ -368,11 +412,14 @@ class Tree(Actor):
 
 class Dude(Actor):
       const_speed  = 0.4
+      initial_hp   = 100
       sprite_names = ["dude-left", "dude-right"]
 
 class Rabbit(Actor):
       const_speed  = 0.5
       anim_speed   = 2.0
+      initial_hp   = 15
+      regeneration = 0.1
       sprite_names = ["rabbit-left", "rabbit-right"]
 
 class Dragon(Actor):
@@ -404,13 +451,18 @@ class FSMController:
       def __init__(self, puppet):
           self.puppet  = puppet
           self.last_hp = puppet.hp
+          self.target  = False
+          self.state   = False
           self.switch(self.start_state)
+      def __str__(self):
+          return "%s: [%s]" % (str(self.__class__).split(".")[1], self.state)
 
       def switch(self, newstate):
           if not newstate in self.states:
             raise self.InvalidState(newstate)
-          self.state       = newstate
-          self.switch_time = time.time()
+          if newstate != self.state:
+            self.state       = newstate
+            self.switch_time = time.time()
 
       def state_time(self):
           return time.time() - self.switch_time
@@ -455,26 +507,58 @@ class RabbitController(FSMController):
             # continue the jolting direction
             pass
 
-
 class DragonController(FSMController):
       states = [ "idle", "follow", "shoot" ]
+      def __str__(self):
+          return "%s: [%s] -> %s" % (str(self.__class__).split(".")[1], self.state, self.target)
+      def valid_target(self, actor):
+          if actor == self.puppet:
+            return False
+          if isinstance(actor, MagicParticle):
+            return False
+          if isinstance(actor, Tree):
+            return False
+          if isinstance(actor, Dragon):
+            return False
+          return True
       def state_change(self):
-          closest = 100
-          for actor in self.puppet.world.all_actors():
-            distance = abs(actor.pos - self.puppet.pos)
-            if distance < closest and actor != self.puppet and actor.__class__ != FireBall:
-              closest = distance
-              target  = actor
-          self.target  = target
+          closest = 75
+          target = False
+          if self.state_time() > 1.0:
+            for actor in self.puppet.world.get_actors(self.puppet.pos - closest,
+                                                      self.puppet.pos + closest,
+                                                      lambda x: self.valid_target(x)):
+              distance = abs(actor.pos - self.puppet.pos)
+              if distance < closest:
+                closest = distance
+                target  = actor
+            if target:
+              self.target = target
+            else:
+              self.switch("idle")
+              self.target = False
+
+          # target_distance
+          if self.target:
+            target_distance = abs(self.target.pos - self.puppet.pos)
 
           # shoot will end by itself
           if self.state != "shoot":
-            if closest > 50:
+            # if no target and or target far away, idly walk around
+            if not self.target or target_distance > 75:
               self.switch("idle")
-            elif closest > 25:
-              self.switch("follow")
-            elif self.state_time() > 1.5:
-              self.switch("shoot")
+              self.target = False
+            # only follow or shoot if we have a target
+            elif self.target:
+              # pause between shots
+              if self.state_time() > 1.5:
+                self.switch("shoot")
+              # only follow if not close enough
+              elif target_distance > 5:
+                self.switch("follow")
+              # walk around near the target
+              else:
+                self.switch("idle")
 
       def state_action(self):
           if self.state == "idle":
@@ -487,24 +571,24 @@ class DragonController(FSMController):
               elif decision == 2:
                 self.puppet.stop()
           elif self.state == "follow":
-            pass
+            if self.target.pos > self.puppet.pos:
+              self.puppet.move_right()
+            else:
+              self.puppet.move_left()
           elif self.state == "shoot":
             if not self.puppet.magic:
+              self.puppet.stop()
               self.puppet.world.add_actor(self.puppet.magic_start(FireBall))
               if self.target.pos > self.puppet.pos:
                 self.puppet.magic_move_right()
               else:
                 self.puppet.magic_move_left()
-            if self.target.pos > self.puppet.pos:
-              if self.puppet.magic.pos > self.target.pos:
-                self.puppet.magic_stop()
-                self.puppet.magic_release()
-                self.switch("idle")
-            else:
-              if self.puppet.magic.pos < self.target.pos:
-                self.puppet.magic_stop()
-                self.puppet.magic_release()
-                self.switch("idle")
+            target_dist = self.target.pos - self.puppet.pos
+            magic_dist  = self.puppet.magic.pos - self.puppet.pos
+            if abs(magic_dist) > abs(target_dist) / 2:
+              self.puppet.magic_stop()
+              self.puppet.magic_release()
+              self.switch("idle")
 
 class ControlledDragon(Dragon):
       control = DragonController
@@ -516,7 +600,7 @@ class Game:
           # initialize pygame
           pygame.init()
           pygame.display.set_caption('Magic')
-          screensize  = (1000, 200)
+          screensize  = (1200, 300)
           self.screen = pygame.display.set_mode(screensize)
           self.clock  = pygame.time.Clock()
 
@@ -533,17 +617,16 @@ class Game:
           sprites.load("dragon.png", "dragon-left", 25, flip = True)
           sprites.load("tree.png", "tree")
 
-
           # set up game objects
           self.view   = view   = View(screensize, (0, 0, 100, 2))
-          self.world  = world  = World(sprites, [FireField, IceField, OilField])
-
-          #self.font   = pygame.font.Font(pygame.font.get_default_font(), 14)
+          self.world  = world  = World(sprites, [FireField, IceField, OilField], view)
 
           world.new_actor(Tree, 50)
           world.new_actor(ControlledDragon, 70)
-          for i in xrange(10):
-            world.new_actor(ControlledRabbit, 100 * random())
+          world.new_actor(ControlledDragon, 75)
+          world.new_actor(ControlledDragon, 80)
+          for i in xrange(50):
+            world.new_actor(ControlledRabbit, 300 * random())
 
           # player-controlled object
           self.dude = world.new_actor(Dude, 10)
@@ -556,10 +639,16 @@ class Game:
           lasttime   = int(time.time())
           frames     = 0
           lastframes = 0
+          fps        = 0
+
+          draw_field_time = 0
+          draw_actor_time = 0
+          update_actor_time = 0
 
           # state
           casting = False
           draw_hp = False
+          draw_debug = False
 
           # omit self.
           dude   = self.dude
@@ -578,10 +667,23 @@ class Game:
             # draw
             day = math.sin(time.time()) + 1
             screen.fill([day * 32, 64 + day * 32, 192 + day * 32])
+            stime = time.time()
             for field in world.all_fields():
               field.draw(view, screen)
+            draw_field_time = time.time() - stime
+            debug_offset = 1
+            stime = time.time()
+            self.world.sort_actors()
             for actor in self.world.all_actors():
-              actor.draw(view, screen, draw_hp = draw_hp)
+              actor.draw(view, screen, draw_hp, int(draw_debug) * debug_offset)
+              debug_offset = (debug_offset + 20) % (view.sc_h() - 20 - 100)
+            draw_actor_time = time.time() - stime
+            # fps txt
+            if draw_debug:
+              fps_txt = world.font.render("FPS: %.1f" % (fps), False, (255, 255, 255))
+              stats   = world.font.render("Actors: %u, Draw field=%.3f actors=%.3f, update actors=%.3f" % (len(world.all_actors()), draw_field_time, draw_actor_time, update_actor_time), False, (255, 255, 255))
+              screen.blit(fps_txt, (10, 10))
+              screen.blit(stats, (10, 25))
             pygame.display.update()
           
             # handle events
@@ -603,6 +705,7 @@ class Game:
           
                 elif event.key == pygame.K_TAB:
                   draw_hp = not draw_hp
+                  draw_debug = not draw_debug
                 elif event.key == pygame.K_LSHIFT:
                   casting = True
                 
@@ -648,14 +751,16 @@ class Game:
                   dude.magic_stop()
           
             # actors moving
+            stime = time.time()
             for actor in world.all_actors():
               actor.update()
+            update_actor_time = time.time() - stime
           
             # calibration
             self.clock.tick(45)
             frames += 1
             if int(time.time()) != lasttime:
-              print "FPS: %f" % (frames - lastframes)
+              fps = (frames - lastframes)
               lasttime   = int(time.time())
               lastframes = frames
           
