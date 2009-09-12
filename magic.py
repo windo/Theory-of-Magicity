@@ -225,6 +225,10 @@ class Actor:
             self.magic.release()
           self.magic = particle(self.world, self.pos + self.direction * self.magic_distance)
           return self.magic
+      def magic_capture(self, particle):
+          if self.magic:
+            self.magic.release()
+          self.magic = particle
       def magic_release(self):
           if self.magic:
             self.magic.release()
@@ -623,8 +627,8 @@ class Game:
 
           world.new_actor(Tree, 50)
           world.new_actor(ControlledDragon, 70)
-          world.new_actor(ControlledDragon, 75)
-          world.new_actor(ControlledDragon, 80)
+          #world.new_actor(ControlledDragon, 75)
+          #world.new_actor(ControlledDragon, 80)
           for i in xrange(50):
             world.new_actor(ControlledRabbit, 300 * random())
 
@@ -645,10 +649,11 @@ class Game:
           draw_actor_time = 0
           update_actor_time = 0
 
-          # state
-          casting = False
-          draw_hp = False
+          # input states
+          casting    = False
+          draw_hp    = False
           draw_debug = False
+          get_magic  = False
 
           # omit self.
           dude   = self.dude
@@ -684,6 +689,14 @@ class Game:
               stats   = world.font.render("Actors: %u, Draw field=%.3f actors=%.3f, update actors=%.3f" % (len(world.all_actors()), draw_field_time, draw_actor_time, update_actor_time), False, (255, 255, 255))
               screen.blit(fps_txt, (10, 10))
               screen.blit(stats, (10, 25))
+            # draw magic selection
+            if get_magic:
+              i = 1
+              local_balls = self.world.get_actors(dude.pos - 100, dude.pos + 100, lambda x: isinstance(x, MagicParticle))
+              for ball in local_balls:
+                ball_txt = world.font.render("%u: %s" % (i, str(ball)), False, ball.field.color)
+                screen.blit(ball_txt, (10, 40 + i * 10))
+                i += 1
             pygame.display.update()
           
             # handle events
@@ -708,6 +721,8 @@ class Game:
                   draw_debug = not draw_debug
                 elif event.key == pygame.K_LSHIFT:
                   casting = True
+                elif event.key == pygame.K_LCTRL:
+                  get_magic = True
                 
                 elif event.key == pygame.K_z:
                   if casting:
@@ -730,6 +745,14 @@ class Game:
                     world.get_field(OilField).toggle_visibility(True)
                   else:
                     world.get_field(OilField).toggle_visibility()
+
+                elif get_magic:
+                  if event.key >= pygame.K_1 and event.key <= pygame.K_9:
+                    idx = event.key - pygame.K_1
+                    if len(local_balls) > idx:
+                      dude.magic_capture(local_balls[idx])
+                      get_magic = False
+                      casting   = True
           
                 elif event.key == pygame.K_a:
                   dude.magic_move_left()
@@ -740,6 +763,8 @@ class Game:
                 if event.key == pygame.K_LSHIFT:
                   dude.magic_release()
                   casting = False
+                if event.key == pygame.K_LCTRL:
+                  get_magic = False
                 elif event.key == pygame.K_LEFT:
                   dude.stop()
                 elif event.key == pygame.K_RIGHT:
