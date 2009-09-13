@@ -105,6 +105,7 @@ class World:
           self.sprites = sprites
           self.view    = view
           self.font    = pygame.font.SysFont("any", 14)
+          self.bigfont = pygame.font.SysFont("any", 20)
           self.fields  = {}
           for fieldtype in fieldtypes:
             field = fieldtype()
@@ -146,12 +147,18 @@ class World:
           return self.fields.values()
 
 class Actor:
-      # misc conf
+      # movement
       const_speed    = 0.0
       const_accel    = 0.0
       magic_distance = 5.0
-      initial_hp     = 100
-      regeneration   = 0.01
+
+      # char attributes
+      initial_hp   = 100
+      regeneration = 0.01
+      magic_energy = 100
+      energy_alloc = []
+      
+      # "puppetmaster"
       control        = None
 
       # animation conf
@@ -695,7 +702,9 @@ class Game:
               local_balls = self.world.get_actors(dude.pos - 100, dude.pos + 100, lambda x: isinstance(x, MagicParticle))
               for ball in local_balls:
                 ball_txt = world.font.render("%u: %s" % (i, str(ball)), False, ball.field.color)
+                ball_nr  = world.bigfont.render("%u" % (i), False, ball.field.color)
                 screen.blit(ball_txt, (10, 40 + i * 10))
+                screen.blit(ball_nr, (view.pl2sc_x(ball.pos), view.sc_h() - 80))
                 i += 1
             # draw dude's magic
             if casting and get_magic and dude.magic:
@@ -719,9 +728,9 @@ class Game:
                   dude.move_right()
           
                 # magic moving
-                elif event.key == pygame.K_a:
+                elif casting and event.key == pygame.K_a:
                   dude.magic_move_left()
-                elif event.key == pygame.K_d:
+                elif casting and event.key == pygame.K_d:
                   dude.magic_move_right()
 
                 # mode switching
@@ -752,7 +761,24 @@ class Game:
                   idx = event.key - pygame.K_1
                   if len(local_balls) > idx:
                     dude.magic_capture(local_balls[idx])
-                    casting   = True
+                    casting = True
+                elif get_magic and not casting and event.key == pygame.K_a:
+                  capture_ball = False
+                  for ball in local_balls:
+                    if ball.pos < dude.pos:
+                      capture_ball = ball
+                  if capture_ball:
+                    dude.magic_capture(capture_ball)
+                    casting = True
+                elif get_magic and not casting and event.key == pygame.K_d:
+                  capture_ball = False
+                  for ball in local_balls:
+                    if ball.pos > dude.pos:
+                      capture_ball = ball
+                      break
+                  if capture_ball:
+                    dude.magic_capture(capture_ball)
+                    casting = True
           
               # key releases
               if event.type == pygame.KEYUP:
