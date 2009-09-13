@@ -207,20 +207,25 @@ class MagicCaster:
 
       # affect controlled particles
       def move_right(self, particle):
-          self.affects[particle][0] = 5.0
-          self.balance_energy()
+          if self.affects.has_key(particle):
+            self.affects[particle][0] = 5.0
+            self.balance_energy()
       def move_left(self, particle):
-          self.affects[particle][0] = -5.0
-          self.balance_energy()
+          if self.affects.has_key(particle):
+            self.affects[particle][0] = -5.0
+            self.balance_energy()
       def power_up(self, particle):
-          self.affects[particle][1] += 1.0
-          self.balance_energy()
+          if self.affects.has_key(particle):
+            self.affects[particle][1] += 1.0
+            self.balance_energy()
       def power_down(self, particle):
-          self.affects[particle][1] -= 1.0
-          self.balance_energy()
+          if self.affects.has_key(particle):
+            self.affects[particle][1] -= 1.0
+            self.balance_energy()
       def stop(self, particle):
-          self.affects[particle][0] = 0
-          self.balance_energy()
+          if self.affects.has_key(particle):
+            self.affects[particle][0] = 0
+            self.balance_energy()
 
       def balance_energy(self):
           """
@@ -359,7 +364,7 @@ class Actor:
             self.controller.update()
       # different Actors can implement their own way of changing their hp
       def damage(self):
-          return self.world.fields.get(FireField).v(self.pos) / 2.0
+          return self.world.fields.get(FireField).v(self.pos) * 25.0
       
       # draw image, either left-right directed or unidirectional
       def draw(self, view, screen, draw_hp = False, draw_debug = False):
@@ -584,7 +589,7 @@ class Dragon(Actor):
           return self.pos, self.dev, self.mult
 
       def damage(self):
-          return self.world.fields.get(IceField).v(self.pos) / 2.0
+          return self.world.fields.get(IceField).v(self.pos) * 25.0
 
 class FSMController:
       states = [ "idle" ]
@@ -779,9 +784,9 @@ class Game:
           for i in xrange(10):
             world.new_actor(Tree, -250 + 100 * i)
           world.new_actor(ControlledDragon, 70)
-          #world.new_actor(ControlledDragon, 75)
-          #world.new_actor(ControlledDragon, 80)
-          for i in xrange(50):
+          world.new_actor(ControlledDragon, 75)
+          world.new_actor(ControlledDragon, 80)
+          for i in xrange(15):
             world.new_actor(ControlledRabbit, 300 * random())
 
           # player-controlled object
@@ -803,8 +808,9 @@ class Game:
           update_actor_time = 0
 
           # extra debugging(?) output
-          draw_hp    = False
-          draw_debug = False
+          draw_hp     = False
+          draw_debug  = False
+          free_camera = False
 
           # input states
           get_magic  = False
@@ -826,13 +832,14 @@ class Game:
             update_actor_time = time.time() - stime
           
             # center view to dude
-            diff = dude.pos - view.get_center_x()
-            if 30.0 > abs(diff) > 5.0:
-              view.move_x(diff * 0.005)
-            elif 45.0 > abs(diff) > 30.0:
-              view.move_x(diff * 0.01)
-            else:
-              view.move_x(diff * 0.1)
+            if not free_camera:
+              diff = dude.pos - view.get_center_x()
+              if 30.0 > abs(diff) > 5.0:
+                view.move_x(diff * 0.005)
+              elif 45.0 > abs(diff) >= 30.0:
+                view.move_x(diff * 0.01)
+              elif abs(diff) >= 45.0:
+                view.move_x(diff * 0.05)
           
             # draw
             # background changes slightly in color
@@ -894,6 +901,15 @@ class Game:
                   dude.move_left()
                 elif event.key == pygame.K_RIGHT:
                   dude.move_right()
+
+                elif event.key == pygame.K_j:
+                  free_camera = True
+                  view.move_x(-10.0)
+                elif event.key == pygame.K_k:
+                  free_camera = False
+                elif event.key == pygame.K_l:
+                  free_camera = True
+                  view.move_x(+10.0)
           
                 # magic moving
                 elif sel_magic and event.key == pygame.K_a:
