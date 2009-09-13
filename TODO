@@ -1,8 +1,4 @@
 Stuff to do, in order:
- * Particle system
-  * Particle energy consumption from Actor (only support so many particles at once without them dissipating)
-  * Particle energy control (hot<->cold)
- * speeds per time(), not per frame
  * (tutorial) level with a story
  * magic language, spells
  * no balls as such, each field draws their own effects?

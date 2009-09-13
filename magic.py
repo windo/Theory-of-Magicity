@@ -102,15 +102,38 @@ class View:
 
 class World:
       def __init__(self, sprites, fieldtypes, view):
-          self.sprites = sprites
-          self.view    = view
-          self.font    = pygame.font.SysFont("any", 14)
-          self.bigfont = pygame.font.SysFont("any", 20)
+          self.sprites     = sprites
+          self.view        = view
+          self.time_offset = 0.0
+          self.pause_start = False
+
+          # world objects
           self.fields  = {}
           for fieldtype in fieldtypes:
             field = fieldtype()
             self.fields[fieldtype] = field
           self.actors  = []
+
+          # for convenience
+          self.font    = pygame.font.SysFont("any", 14)
+          self.bigfont = pygame.font.SysFont("any", 20)
+
+      def time(self):
+          if self.pause_start:
+            return self.pause_start
+          return time.time() - self.time_offset
+
+      def pause(self):
+          if self.pause_start:
+            self.time_offset += time.time() - self.pause_start
+            self.pause_start = False
+          else:
+            self.pause_start = time.time()
+      def paused(self):
+          if self.pause_start:
+            return True
+          else:
+            return False
 
       # actor management
       def new_actor(self, actor_class, pos):
@@ -148,9 +171,10 @@ class MagicCaster:
       magic_distance = 5.0
 
       def __init__(self, actor, magic_energy):
-          self.actor        = actor
-          self.magic_energy = magic_energy
-          self.affects      = {}
+          self.actor   = actor
+          self.energy  = magic_energy
+          self.used    = 0.0
+          self.affects = {}
 
       # called by controllers
       # manage controlled particles list
@@ -161,8 +185,8 @@ class MagicCaster:
           # make a new particle
           pos = self.actor.pos + self.actor.direction * self.magic_distance
           particle = self.actor.world.new_actor(particletype, pos)
-          # register to influence it
-          self.affects[particle] = [0.0, 1.0]
+          # register to influence it [speed, power]
+          self.affects[particle] = [0.0, 10.0]
           particle.affect(self)
           # return it to the caller
           return particle
@@ -183,15 +207,40 @@ class MagicCaster:
 
       # affect controlled particles
       def move_right(self, particle):
-          self.affects[particle][0] = 1.0
+          self.affects[particle][0] = 5.0
+          self.balance_energy()
       def move_left(self, particle):
-          self.affects[particle][0] = -1.0
+          self.affects[particle][0] = -5.0
+          self.balance_energy()
       def power_up(self, particle):
           self.affects[particle][1] += 1.0
+          self.balance_energy()
       def power_down(self, particle):
           self.affects[particle][1] -= 1.0
+          self.balance_energy()
       def stop(self, particle):
           self.affects[particle][0] = 0
+          self.balance_energy()
+
+      def balance_energy(self):
+          """
+          go over the list of affects and make sure we stay within
+          the energy consumption limit
+          """
+          used = 0.0
+          for speed, power in self.affects.values():
+            used += abs(speed) + abs(power)
+          if used > self.energy:
+            ratio = self.energy / used
+            for affect in self.affects.keys():
+              speed, power = self.affects[affect]
+              speed *= ratio
+              power *= ratio
+              self.affects[affect] = [speed, power]
+            corrected = 0.0
+            for speed, power in self.affects.values():
+              corrected += abs(speed) + abs(power)
+            #print "used=%.1f > total=%.1f -> ratio=%.2f: corrected=%.1f" % (used, self.energy, ratio, corrected)
 
       # called by particles
       def affect_particle(self, particle):
@@ -215,7 +264,7 @@ class Actor:
       # char attributes
       initial_hp   = 100.0
       regeneration = 0.01
-      magic_energy = 10.0
+      magic_energy = 25.0
       
       # "puppetmaster"
       control        = None
@@ -226,6 +275,9 @@ class Actor:
           self.accel = 0.0
           self.pos   = pos
           self.world = world
+          # actor clock
+          self.last_update = world.time()
+          self.timediff    = 0.0
 
           # animation params
           self.start_time = time.time()
@@ -286,12 +338,19 @@ class Actor:
 
      # called every frame
       def update(self):
+          # update actor clock
+          now              = self.world.time()
+          self.timediff    = now - self.last_update
+          self.last_update = now
+          # update movement
           if self.accel:
-            self.speed += self.accel
+            self.speed += self.timediff * self.accel
           if self.speed:
-            self.pos  += self.speed * self.world.get_field(OilField).v(self.pos)
+            self.pos  += self.timediff * self.speed * self.world.get_field(OilField).v(self.pos)
           # effects of magic
-          self.update_hp()
+          self.hp -= self.timediff * self.damage()
+          if self.hp < self.initial_hp:
+            self.hp += self.timediff * self.regeneration
           # death
           if self.hp <= 0 and self.initial_hp:
             self.world.del_actor(self)
@@ -299,10 +358,8 @@ class Actor:
           if self.controller:
             self.controller.update()
       # different Actors can implement their own way of changing their hp
-      def update_hp(self):
-          self.hp -= self.world.fields.get(FireField).v(self.pos) / 2.0
-          if self.hp < self.initial_hp:
-            self.hp += self.regeneration
+      def damage(self):
+          return self.world.fields.get(FireField).v(self.pos) / 2.0
       
       # draw image, either left-right directed or unidirectional
       def draw(self, view, screen, draw_hp = False, draw_debug = False):
@@ -403,7 +460,7 @@ class MagicField:
 
 class MagicParticle(Actor):
       # Actor params
-      const_accel  = 0.02
+      const_accel  = 5.0
       animate_stop = True
       anim_speed   = 3.0
       hover_height = 25.0
@@ -413,12 +470,13 @@ class MagicParticle(Actor):
       # Particle params
       base_dev     = 5.0
       base_mult    = 10.0
+      mult_speed   = 0.1  # percentage change per second
       energy_drain = 30.0
 
       def __init__(self, world, pos):
           Actor.__init__(self, world, pos)
           self.field     = world.get_field(self.fieldtype)
-          self.dev       = 1.0
+          self.dev       = self.base_dev
           self.mult      = 1.0
           self.deadtimer = False
           self.field.add_particle(self)
@@ -439,7 +497,7 @@ class MagicParticle(Actor):
 
       # particle params (position, normal distribution params) for field calculation
       def get_params(self):
-          return self.pos, self.dev, self.mult
+          return [self.pos, self.dev, self.mult]
 
       def destroy(self):
           # no more field effects
@@ -458,17 +516,18 @@ class MagicParticle(Actor):
           mult  = 0.0
           for caster in self.affects:
             affects = caster.affect_particle(self)
-            accel += affects[0] * 0.01
+            accel += affects[0]
             mult  += affects[1]
           self.accel = accel
-          self.mult  = mult
+          self.mult += (mult - self.mult) * self.mult_speed * self.timediff
 
           # if the power drops too low, terminate itself
           if self.mult < 0.1:
-            if self.deadtimer and self.deadtimer + 1.0 < time.time():
-              self.destroy()
+            if self.deadtimer:
+              if self.deadtimer + 1.0 < self.world.time():
+                self.destroy()
             else:
-              self.deadtimer = time.time()
+              self.deadtimer = self.world.time()
 
 class FireField(MagicField):
       color = (255, 0, 0)
@@ -484,7 +543,11 @@ class FireBall(MagicParticle):
       fieldtype    = FireField
 class IceBall(MagicParticle):
       sprite_names = ["iceball"]
-      fieldtype    = IceField
+      fieldtype    = FireField
+      def get_params(self):
+          params = MagicParticle.get_params(self)
+          params[2] *= -1
+          return params
 class OilBall(MagicParticle):
       sprite_names = ["oilball"]
       fieldtype    = OilField
@@ -495,19 +558,19 @@ class Tree(Actor):
       initial_hp   = 0
 
 class Dude(Actor):
-      const_speed  = 0.4
+      const_speed  = 4.0
       initial_hp   = 100
       sprite_names = ["dude-left", "dude-right"]
 
 class Rabbit(Actor):
-      const_speed  = 0.5
+      const_speed  = 9.0
       anim_speed   = 2.0
       initial_hp   = 15
       regeneration = 0.1
       sprite_names = ["rabbit-left", "rabbit-right"]
 
 class Dragon(Actor):
-      const_speed  = 0.1
+      const_speed  = 2.0
       sprite_names = ["dragon-left", "dragon-right"]
       def __init__(self, world, pos):
           Actor.__init__(self, world, pos)
@@ -519,8 +582,8 @@ class Dragon(Actor):
       def get_params(self):
           return self.pos, self.dev, self.mult
 
-      def update_hp(self):
-          self.hp -= self.world.fields.get(IceField).v(self.pos) / 2.0
+      def damage(self):
+          return self.world.fields.get(IceField).v(self.pos) / 2.0
 
 class FSMController:
       states = [ "idle" ]
@@ -756,21 +819,28 @@ class Game:
           while forever:
             # actors moving
             stime = time.time()
-            for actor in world.all_actors():
-              actor.update()
+            if not world.paused():
+              for actor in world.all_actors():
+                actor.update()
             update_actor_time = time.time() - stime
           
             # center view to dude
             diff = dude.pos - view.get_center_x()
             if 30.0 > abs(diff) > 5.0:
               view.move_x(diff * 0.005)
-            elif abs(diff) > 30.0:
+            elif 45.0 > abs(diff) > 30.0:
               view.move_x(diff * 0.01)
+            else:
+              view.move_x(diff * 0.1)
           
             # draw
             # background changes slightly in color
-            day = math.sin(time.time()) + 1
-            screen.fill([day * 32, 64 + day * 32, 192 + day * 32])
+            if world.paused():
+              day = -1.0
+              screen.fill([16, 32, 96])
+            else:
+              day = math.sin(time.time()) + 1
+              screen.fill([day * 32, 64 + day * 32, 192 + day * 32])
             # draw fields
             stime = time.time()
             for field in world.all_fields():
@@ -814,6 +884,9 @@ class Game:
               if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                   forever = False
+
+                if event.key == pygame.K_p:
+                  world.pause()
           
                 # dude moving
                 elif event.key == pygame.K_LEFT:
