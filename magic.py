@@ -197,13 +197,19 @@ class MagicCaster:
           if not self.affects.has_key(particle):
             self.affects[particle] = [0.0, 0.0]
             particle.affect(self)
-      def release(self):
+      def release(self, particle):
           """
           cease controlling a particle
           """
           if self.affects.has_key(particle):
             del self.affects[particle]
             particle.release(self)
+      def release_all(self):
+          """
+          release all particles
+          """
+          for particle in self.affects.keys():
+            self.release(particle)
 
       # affect controlled particles
       def move_right(self, particle):
@@ -312,11 +318,16 @@ class Actor:
             self.controller = self.control(self)
           else:
             self.controller = None
+      def destroy(self):
+          self.world.del_actor(self)
+          self.magic.release_all()
 
       def __str__(self):
-          desc = "%s(0x%s) pos=%.1f speed=%.3f" % (str(self.__class__).split(".")[1], id(self), self.pos, self.speed)
+          return "%s(0x%s)" % (str(self.__class__).split(".")[1], id(self))
+      def debug_info(self):
+          desc = "%s pos=%.1f speed=%.3f" % (str(self), self.pos, self.speed)
           if self.controller:
-            desc += "\n Controller: %s" % (str(self.controller))
+            desc += "\nController: %s" % (self.controller.debug_info())
           return desc
 
       # moving the actor
@@ -358,7 +369,7 @@ class Actor:
             self.hp += self.timediff * self.regeneration
           # death
           if self.hp <= 0 and self.initial_hp:
-            self.world.del_actor(self)
+            self.destroy()
           # controlled actors
           if self.controller:
             self.controller.update()
@@ -407,13 +418,13 @@ class Actor:
             pygame.draw.rect(screen, hp_color, hp_fill, 0)
 
           if draw_debug:
-            lines = str(self).split("\n")
+            lines = self.debug_info().split("\n")
             txts  = []
             for line in lines:
               txts.append(self.world.font.render(line, False, (255, 255, 255)))
             i = 0
             for txt in txts:
-              screen.blit(txt,(view.pl2sc_x(self.pos) - 100, int(draw_debug) + 20 + i * 10))
+              screen.blit(txt,(view.pl2sc_x(self.pos) - img.get_width() / 2, int(draw_debug) + 20 + i * 10))
               i += 1
 
 class MagicField:
@@ -475,8 +486,7 @@ class MagicParticle(Actor):
       # Particle params
       base_dev     = 5.0
       base_mult    = 10.0
-      mult_speed   = 0.1  # percentage change per second
-      energy_drain = 30.0
+      mult_speed   = 0.25  # percentage change per second
 
       def __init__(self, world, pos):
           Actor.__init__(self, world, pos)
@@ -489,9 +499,9 @@ class MagicParticle(Actor):
           # actors who are influencing this particle
           self.affects = []
 
-      def __str__(self):
-          desc = Actor.__str__(self)
-          desc += "\nAffecting: %s" % (", ".join([str(aff.actor.__class__).split(".")[1] for aff in self.affects]))
+      def debug_info(self):
+          desc = Actor.debug_info(self)
+          desc += "\nAffecting: %s" % (", ".join([str(aff.actor) for aff in self.affects]))
           return desc
 
       # MagicCasters register to influence the particle
@@ -582,7 +592,10 @@ class Dragon(Actor):
           Actor.__init__(self, world, pos)
           self.dev   = 1.0
           self.mult  = 2.0
-          world.fields.get(FireField).add_particle(self)
+          self.world.fields.get(FireField).add_particle(self)
+      def destroy(self):
+          Actor.destroy(self)
+          self.world.fields.get(FireField).del_particle(self)
 
       # particle params (normal distribution)
       def get_params(self):
@@ -607,7 +620,9 @@ class FSMController:
           self.state   = False
           self.switch(self.start_state)
       def __str__(self):
-          return "%s: [%s]" % (str(self.__class__).split(".")[1], self.state)
+          return "%s" % (str(self.__class__).split(".")[1])
+      def debug_info(self):
+          return "%s: [%s]" % (str(self), self.state)
 
       def switch(self, newstate):
           if not newstate in self.states:
@@ -665,8 +680,8 @@ class DragonController(FSMController):
           FSMController.__init__(self, puppet)
           self.target = False
           self.shot   = False
-      def __str__(self):
-          return "%s: [%s] -> %s" % (str(self.__class__).split(".")[1], self.state, self.target)
+      def debug_info(self):
+          return "%s target=%s" % (FSMController.debug_info(self), self.target)
 
       def valid_target(self, actor):
           """
@@ -848,7 +863,7 @@ class Game:
               screen.fill([16, 32, 96])
             else:
               day = math.sin(time.time()) + 1
-              screen.fill([day * 32, 64 + day * 32, 192 + day * 32])
+              screen.fill([day * 32, 32 + day * 32, 128 + day * 32])
             # draw fields
             stime = time.time()
             for field in world.all_fields():
@@ -920,6 +935,10 @@ class Game:
                   dude.magic.power_up(sel_magic)
                 elif sel_magic and event.key == pygame.K_s:
                   dude.magic.power_down(sel_magic)
+                elif sel_magic and event.key == pygame.K_r:
+                  dude.magic.release(sel_magic)
+                elif event.key == pygame.K_r:
+                  dude.magic.release_all()
 
                 # mode switching
                 elif event.key == pygame.K_TAB:
