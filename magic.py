@@ -117,8 +117,6 @@ class World:
           actor = actor_class(self, pos)
           self.actors.append(actor)
           return actor
-      def add_actor(self, actor):
-          self.actors.append(actor)
       def del_actor(self, actor):
           self.actors.pop(self.actors.index(actor))
       def all_actors(self):
@@ -146,25 +144,82 @@ class World:
       def all_fields(self):
           return self.fields.values()
 
+class MagicCaster:
+      magic_distance = 5.0
+
+      def __init__(self, actor, magic_energy):
+          self.actor        = actor
+          self.magic_energy = magic_energy
+          self.affects      = {}
+
+      # called by controllers
+      # manage controlled particles list
+      def new(self, particletype):
+          """
+          make a new particle and control it
+          """
+          # make a new particle
+          pos = self.actor.pos + self.actor.direction * self.magic_distance
+          particle = self.actor.world.new_actor(particletype, pos)
+          # register to influence it
+          self.affects[particle] = [0.0, 1.0]
+          particle.affect(self)
+          # return it to the caller
+          return particle
+      def capture(self, particle):
+          """
+          add to the list of controlled particles
+          """
+          if not self.affects.has_key(particle):
+            self.affects[particle] = [0.0, 0.0]
+            particle.affect(self)
+      def release(self):
+          """
+          cease controlling a particle
+          """
+          if self.affects.has_key(particle):
+            del self.affects[particle]
+            particle.release(self)
+
+      # affect controlled particles
+      def move_right(self, particle):
+          self.affects[particle][0] = 1.0
+      def move_left(self, particle):
+          self.affects[particle][0] = -1.0
+      def power_up(self, particle):
+          self.affects[particle][1] += 1.0
+      def power_down(self, particle):
+          self.affects[particle][1] -= 1.0
+      def stop(self, particle):
+          self.affects[particle][0] = 0
+
+      # called by particles
+      def affect_particle(self, particle):
+          return self.affects[particle]
+      def notify_destroy(self, particle):
+          if self.affects.has_key(particle):
+            del self.affects[particle]
+          
+
 class Actor:
       # movement
       const_speed    = 0.0
       const_accel    = 0.0
-      magic_distance = 5.0
+
+      # animation conf
+      animate_stop = False
+      anim_speed   = 1.0
+      hover_height = 0.0
+      directed     = True
 
       # char attributes
-      initial_hp   = 100
+      initial_hp   = 100.0
       regeneration = 0.01
-      magic_energy = 100
-      energy_alloc = []
+      magic_energy = 10.0
       
       # "puppetmaster"
       control        = None
 
-      # animation conf
-      anim_speed   = 1.0
-      hover_height = 0.0
-      directed     = True
       def __init__(self, world, pos):
           # movement params
           self.speed = 0.0
@@ -175,11 +230,11 @@ class Actor:
           # animation params
           self.start_time = time.time()
           self.direction  = -1
-          self.moving     = False
+          self.animate    = self.animate_stop
 
           # character params
-          self.magic = False
-          self.hp    = self.initial_hp
+          self.hp     = self.initial_hp
+          self.magic  = MagicCaster(self, self.magic_energy)
 
           # load images
           if self.directed:
@@ -202,7 +257,10 @@ class Actor:
             self.controller = None
 
       def __str__(self):
-          return "%s(0x%s) @ %.1f + %.3f" % (str(self.__class__).split(".")[1], id(self), self.pos, self.speed)
+          desc = "%s(0x%s) pos=%.1f speed=%.3f" % (str(self.__class__).split(".")[1], id(self), self.pos, self.speed)
+          if self.controller:
+            desc += "\n Controller: %s" % (str(self.controller))
+          return desc
 
       # moving the actor
       def move_left(self):
@@ -210,47 +268,23 @@ class Actor:
             self.speed   = -self.const_speed
           else:
             self.accel   = -self.const_accel
-          self.moving    = True
+          self.animate   = True
           self.direction = -1
       def move_right(self):
           if not self.const_accel:
             self.speed   = self.const_speed
           else:
             self.accel   = self.const_accel
-          self.moving    = True
+          self.animate   = True
           self.direction = 1
       def stop(self):
           if not self.const_accel:
             self.speed   = 0
           else:
             self.accel   = 0
-          self.moving    = False
+          self.animate   = self.animate_stop
 
-      # doing magic
-      def magic_start(self, particle):
-          if self.magic:
-            self.magic.release()
-          self.magic = particle(self.world, self.pos + self.direction * self.magic_distance)
-          return self.magic
-      def magic_capture(self, particle):
-          if self.magic:
-            self.magic.release()
-          self.magic = particle
-      def magic_release(self):
-          if self.magic:
-            self.magic.release()
-            self.magic = False
-      def magic_move_right(self):
-          if self.magic:
-            self.magic.move_right()
-      def magic_move_left(self):
-          if self.magic:
-            self.magic.move_left()
-      def magic_stop(self):
-          if self.magic:
-            self.magic.stop()
-
-      # called every frame
+     # called every frame
       def update(self):
           if self.accel:
             self.speed += self.accel
@@ -286,7 +320,7 @@ class Actor:
             imglist = self.img_list
 
           # to animate or not to animate
-          if self.moving:
+          if self.animate:
             self.cur_img_idx = int(time.time() * self.img_count * self.anim_speed) % self.img_count
           else:
             self.cur_img_idx = 0
@@ -304,17 +338,21 @@ class Actor:
 
           # draw hp bar
           if draw_hp and self.initial_hp:
-            hpcolor = (64, 255, 64)
-            border  = (view.pl2sc_x(self.pos), view.sc_h() - self.img_h - hover, 30, 3)
-            fill    = (view.pl2sc_x(self.pos), view.sc_h() - self.img_h - hover, 30 * (self.hp / self.initial_hp), 3)
-            pygame.draw.rect(screen, hpcolor, border, 1)
-            pygame.draw.rect(screen, hpcolor, fill, 0)
+            hp_color   = (64, 255, 64)
+            hp_border  = (view.pl2sc_x(self.pos), view.sc_h() - self.img_h - hover, 30, 3)
+            hp_fill    = (view.pl2sc_x(self.pos), view.sc_h() - self.img_h - hover, 30 * (self.hp / self.initial_hp), 3)
+            pygame.draw.rect(screen, hp_color, hp_border, 1)
+            pygame.draw.rect(screen, hp_color, hp_fill, 0)
 
           if draw_debug:
-            text_self       = self.world.font.render(str(self), False, (255, 255, 255))
-            text_controller = self.world.font.render(str(self.controller), False, (255, 255, 255))
-            screen.blit(text_self,       (view.pl2sc_x(self.pos) - 100, int(draw_debug) + 20))
-            screen.blit(text_controller, (view.pl2sc_x(self.pos) - 100, int(draw_debug) + 30))
+            lines = str(self).split("\n")
+            txts  = []
+            for line in lines:
+              txts.append(self.world.font.render(line, False, (255, 255, 255)))
+            i = 0
+            for txt in txts:
+              screen.blit(txt,(view.pl2sc_x(self.pos) - 100, int(draw_debug) + 20 + i * 10))
+              i += 1
 
 class MagicField:
       """
@@ -364,38 +402,73 @@ class MagicField:
               pygame.draw.line(screen, self.color, self.sc_value(view, pos * step), self.sc_value(view, (pos + 1) * step))
 
 class MagicParticle(Actor):
+      # Actor params
       const_accel  = 0.02
+      animate_stop = True
       anim_speed   = 3.0
       hover_height = 25.0
       initial_hp   = 0
       directed     = False
+
+      # Particle params
+      base_dev     = 5.0
+      base_mult    = 10.0
+      energy_drain = 30.0
+
       def __init__(self, world, pos):
           Actor.__init__(self, world, pos)
-          self.field  = world.get_field(self.fieldtype)
-          self.dev    = 5.0
-          self.mult   = 10.0
-          self.decay  = 1.0
+          self.field     = world.get_field(self.fieldtype)
+          self.dev       = 1.0
+          self.mult      = 1.0
+          self.deadtimer = False
           self.field.add_particle(self)
 
-      def destroy(self):
-          self.field.del_particle(self)
-          self.world.del_actor(self)
+          # actors who are influencing this particle
+          self.affects = []
 
-      def release(self):
-          self.decay = 0.995
+      def __str__(self):
+          desc = Actor.__str__(self)
+          desc += "\nAffecting: %s" % (", ".join([str(aff.actor.__class__).split(".")[1] for aff in self.affects]))
+          return desc
 
-      # particle params (normal distribution)
+      # MagicCasters register to influence the particle
+      def affect(self, caster):
+          self.affects.append(caster)
+      def release(self, caster):
+          self.affects.pop(self.affects.index(caster))
+
+      # particle params (position, normal distribution params) for field calculation
       def get_params(self):
           return self.pos, self.dev, self.mult
 
+      def destroy(self):
+          # no more field effects
+          self.field.del_particle(self)
+          # remove from world
+          self.world.del_actor(self)
+          # notify casters that the particle is gone now
+          for caster in self.affects:
+            caster.notify_destroy(self)
+
       def update(self):
-          self.moving = True
           Actor.update(self)
-          self.mult *= self.decay
+         
+          # each caster can effect the particle
+          accel = 0.0
+          mult  = 0.0
+          for caster in self.affects:
+            affects = caster.affect_particle(self)
+            accel += affects[0] * 0.01
+            mult  += affects[1]
+          self.accel = accel
+          self.mult  = mult
+
+          # if the power drops too low, terminate itself
           if self.mult < 0.1:
-            self.destroy()
-      def update_hp(self):
-          pass
+            if self.deadtimer and self.deadtimer + 1.0 < time.time():
+              self.destroy()
+            else:
+              self.deadtimer = time.time()
 
 class FireField(MagicField):
       color = (255, 0, 0)
@@ -462,7 +535,6 @@ class FSMController:
       def __init__(self, puppet):
           self.puppet  = puppet
           self.last_hp = puppet.hp
-          self.target  = False
           self.state   = False
           self.switch(self.start_state)
       def __str__(self):
@@ -520,9 +592,17 @@ class RabbitController(FSMController):
 
 class DragonController(FSMController):
       states = [ "idle", "follow", "shoot" ]
+      def __init__(self, puppet):
+          FSMController.__init__(self, puppet)
+          self.target = False
+          self.shot   = False
       def __str__(self):
           return "%s: [%s] -> %s" % (str(self.__class__).split(".")[1], self.state, self.target)
+
       def valid_target(self, actor):
+          """
+          Decide if an Actor is worth targeting
+          """
           if actor == self.puppet:
             return False
           if isinstance(actor, MagicParticle):
@@ -587,18 +667,18 @@ class DragonController(FSMController):
             else:
               self.puppet.move_left()
           elif self.state == "shoot":
-            if not self.puppet.magic:
-              self.puppet.stop()
-              self.puppet.world.add_actor(self.puppet.magic_start(FireBall))
+            if not self.shot:
+              self.shot = self.puppet.magic.new(FireBall)
               if self.target.pos > self.puppet.pos:
-                self.puppet.magic_move_right()
+                self.puppet.magic.move_right(self.shot)
               else:
-                self.puppet.magic_move_left()
+                self.puppet.magic.move_left(self.shot)
             target_dist = self.target.pos - self.puppet.pos
-            magic_dist  = self.puppet.magic.pos - self.puppet.pos
+            magic_dist  = self.shot.pos - self.puppet.pos
             if abs(magic_dist) > abs(target_dist) / 2:
-              self.puppet.magic_stop()
-              self.puppet.magic_release()
+              self.puppet.magic.stop(self.shot)
+              #self.puppet.magic.release(self.shot)
+              self.shot = False
               self.switch("idle")
 
 class ControlledDragon(Dragon):
@@ -632,7 +712,8 @@ class Game:
           self.view   = view   = View(screensize, (0, 0, 100, 2))
           self.world  = world  = World(sprites, [FireField, IceField, OilField], view)
 
-          world.new_actor(Tree, 50)
+          for i in xrange(10):
+            world.new_actor(Tree, -250 + 100 * i)
           world.new_actor(ControlledDragon, 70)
           #world.new_actor(ControlledDragon, 75)
           #world.new_actor(ControlledDragon, 80)
@@ -652,15 +733,19 @@ class Game:
           lastframes = 0
           fps        = 0
 
+          # performance debugging stats
           draw_field_time = 0
           draw_actor_time = 0
           update_actor_time = 0
 
-          # input states
-          casting    = False
+          # extra debugging(?) output
           draw_hp    = False
           draw_debug = False
+
+          # input states
           get_magic  = False
+          cast_magic = False
+          sel_magic  = False
 
           # omit self.
           dude   = self.dude
@@ -669,6 +754,12 @@ class Game:
           screen = self.screen
 
           while forever:
+            # actors moving
+            stime = time.time()
+            for actor in world.all_actors():
+              actor.update()
+            update_actor_time = time.time() - stime
+          
             # center view to dude
             diff = dude.pos - view.get_center_x()
             if 30.0 > abs(diff) > 5.0:
@@ -677,12 +768,15 @@ class Game:
               view.move_x(diff * 0.01)
           
             # draw
+            # background changes slightly in color
             day = math.sin(time.time()) + 1
             screen.fill([day * 32, 64 + day * 32, 192 + day * 32])
+            # draw fields
             stime = time.time()
             for field in world.all_fields():
               field.draw(view, screen)
             draw_field_time = time.time() - stime
+            # draw actors (with debug data?)
             debug_offset = 1
             stime = time.time()
             self.world.sort_actors()
@@ -690,7 +784,7 @@ class Game:
               actor.draw(view, screen, draw_hp, int(draw_debug) * debug_offset)
               debug_offset = (debug_offset + 20) % (view.sc_h() - 20 - 100)
             draw_actor_time = time.time() - stime
-            # fps txt
+            # draw performance stats
             if draw_debug:
               fps_txt = world.font.render("FPS: %.1f" % (fps), False, (255, 255, 255))
               stats   = world.font.render("Actors: %u, Draw field=%.3f actors=%.3f, update actors=%.3f" % (len(world.all_actors()), draw_field_time, draw_actor_time, update_actor_time), False, (255, 255, 255))
@@ -706,9 +800,9 @@ class Game:
                 screen.blit(ball_txt, (10, 40 + i * 10))
                 screen.blit(ball_nr, (view.pl2sc_x(ball.pos), view.sc_h() - 80))
                 i += 1
-            # draw dude's magic
-            if casting and get_magic and dude.magic:
-              pygame.draw.circle(screen, (255, 255, 255), (view.pl2sc_x(dude.magic.pos), view.sc_h() - 40), 25, 1)
+            # draw dude's magic (magic selection)
+            if sel_magic:
+              pygame.draw.circle(screen, (255, 255, 255), (view.pl2sc_x(sel_magic.pos), view.sc_h() - 40), 25, 1)
             pygame.display.update()
           
             # handle events
@@ -728,31 +822,42 @@ class Game:
                   dude.move_right()
           
                 # magic moving
-                elif casting and event.key == pygame.K_a:
-                  dude.magic_move_left()
-                elif casting and event.key == pygame.K_d:
-                  dude.magic_move_right()
+                elif sel_magic and event.key == pygame.K_a:
+                  dude.magic.move_left(sel_magic)
+                elif sel_magic and event.key == pygame.K_d:
+                  dude.magic.move_right(sel_magic)
+                elif sel_magic and event.key == pygame.K_w:
+                  dude.magic.power_up(sel_magic)
+                elif sel_magic and event.key == pygame.K_s:
+                  dude.magic.power_down(sel_magic)
 
                 # mode switching
                 elif event.key == pygame.K_TAB:
-                  draw_hp = not draw_hp
+                  draw_hp    = not draw_hp
                   draw_debug = not draw_debug
                 elif event.key == pygame.K_LSHIFT:
-                  casting = True
+                  cast_magic = True
+                  sel_magic  = False
                 elif event.key == pygame.K_LCTRL:
-                  get_magic = True
+                  get_magic  = True
+                  sel_magic  = False
                 
-                # casting & fields
-                elif casting and event.key == pygame.K_z:
-                  world.add_actor(dude.magic_start(FireBall))
+                # cast_magic & fields
+                elif cast_magic and event.key == pygame.K_z:
+                  sel_magic = dude.magic.new(FireBall)
+                  casting = False
+                elif cast_magic and event.key == pygame.K_x:
+                  sel_magic = dude.magic.new(IceBall)
+                  casting = False
+                elif cast_magic and event.key == pygame.K_c:
+                  sel_magic = dude.magic.new(OilBall)
+                  casting = False
+
+                # toggle magic fields
                 elif event.key == pygame.K_z:
                   world.get_field(FireField).toggle_visibility()
-                elif casting and event.key == pygame.K_x:
-                  world.add_actor(dude.magic_start(IceBall))
                 elif event.key == pygame.K_x:
                   world.get_field(IceField).toggle_visibility()
-                elif casting and event.key == pygame.K_c:
-                  world.add_actor(dude.magic_start(OilBall))
                 elif event.key == pygame.K_c:
                   world.get_field(OilField).toggle_visibility()
 
@@ -760,49 +865,45 @@ class Game:
                 elif get_magic and event.key >= pygame.K_1 and event.key <= pygame.K_9:
                   idx = event.key - pygame.K_1
                   if len(local_balls) > idx:
-                    dude.magic_capture(local_balls[idx])
-                    casting = True
-                elif get_magic and not casting and event.key == pygame.K_a:
+                    sel_magic = local_balls[idx]
+                    dude.magic.capture(sel_magic)
+                elif get_magic and not cast_magic and event.key == pygame.K_a:
                   capture_ball = False
                   for ball in local_balls:
                     if ball.pos < dude.pos:
                       capture_ball = ball
                   if capture_ball:
-                    dude.magic_capture(capture_ball)
-                    casting = True
-                elif get_magic and not casting and event.key == pygame.K_d:
+                    sel_magic = capture_ball
+                    dude.magic.capture(sel_magic)
+                elif get_magic and not cast_magic and event.key == pygame.K_d:
                   capture_ball = False
                   for ball in local_balls:
                     if ball.pos > dude.pos:
                       capture_ball = ball
                       break
                   if capture_ball:
-                    dude.magic_capture(capture_ball)
-                    casting = True
+                    sel_magic = capture_ball
+                    dude.magic.capture(sel_magic)
           
               # key releases
               if event.type == pygame.KEYUP:
-                if event.key == pygame.K_LSHIFT:
-                  dude.magic_release()
-                  casting = False
-                if event.key == pygame.K_LCTRL:
-                  get_magic = False
-                  casting   = False
-                elif event.key == pygame.K_LEFT:
+                # movement
+                if event.key == pygame.K_LEFT:
                   dude.stop()
                 elif event.key == pygame.K_RIGHT:
                   dude.stop()
-          
-                elif event.key == pygame.K_a:
-                  dude.magic_stop()
-                elif event.key == pygame.K_d:
-                  dude.magic_stop()
-          
-            # actors moving
-            stime = time.time()
-            for actor in world.all_actors():
-              actor.update()
-            update_actor_time = time.time() - stime
+
+                # magic movement
+                elif event.key == pygame.K_a and sel_magic:
+                  dude.magic.stop(sel_magic)
+                elif event.key == pygame.K_d and sel_magic:
+                  dude.magic.stop(sel_magic)
+
+                # input modes
+                elif event.key == pygame.K_LSHIFT:
+                  cast_magic = False
+                elif event.key == pygame.K_LCTRL:
+                  get_magic = False
           
             # calibration
             self.clock.tick(45)
