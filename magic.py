@@ -543,11 +543,12 @@ class FireBall(MagicParticle):
       fieldtype    = FireField
 class IceBall(MagicParticle):
       sprite_names = ["iceball"]
-      fieldtype    = FireField
-      def get_params(self):
-          params = MagicParticle.get_params(self)
-          params[2] *= -1
-          return params
+      fieldtype    = IceField
+      #fieldtype    = FireField
+      #def get_params(self):
+      #    params = MagicParticle.get_params(self)
+      #    params[2] *= -1
+      #    return params
 class OilBall(MagicParticle):
       sprite_names = ["oilball"]
       fieldtype    = OilField
