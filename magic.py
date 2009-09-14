@@ -274,7 +274,7 @@ class Actor:
 
       # char attributes
       initial_hp   = 100.0
-      regeneration = 0.01
+      regeneration = 0.1
       magic_energy = 25.0
       
       # "puppetmaster"
@@ -582,7 +582,7 @@ class Rabbit(Actor):
       const_speed  = 9.0
       anim_speed   = 2.0
       initial_hp   = 15
-      regeneration = 0.1
+      regeneration = 1.0
       sprite_names = ["rabbit-left", "rabbit-right"]
 
 class Dragon(Actor):
