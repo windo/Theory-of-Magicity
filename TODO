@@ -1,4 +1,22 @@
 Stuff to do, in order:
- * (tutorial) level with a story
- * magic language, spells
+ * a working set of fields and balls
+ * a (tutorial) level with a story
+ * sound effects
+  * each field has a sound effect (or both positive and negative), volume determined by field strength
+ * visual effects
+  * each field has them
+ * music
+ * title screen
+
+Ideas:
  * no balls as such, each field draws their own effects?
+ * language
+  * magic can be written in a language, spells written and read
+  * magic casters (NPCs) can be scripted
+ * (massively ;) multiplayer world
+  * gods/cabals in a round world
+  * each god/cabal has a limited number of items of special power
+   * the god distributes the items to followers to do his bidding
+   * the shrine must be protected (source if items' power)
+   * the opposing side of magic must be conquered
+ * very good programmer's documentation of the game
