@@ -168,6 +168,12 @@ class World:
           return self.fields.values()
 
 class MagicCaster:
+      """
+      Supplements an Actor
+
+      It handles the list of magic particles controlled by an actor
+      It manages how the actor influences the particles
+      """
       magic_distance = 5.0
 
       def __init__(self, actor, magic_energy):
@@ -259,7 +265,6 @@ class MagicCaster:
       def notify_destroy(self, particle):
           if self.affects.has_key(particle):
             del self.affects[particle]
-          
 
 class Actor:
       # movement
@@ -274,7 +279,7 @@ class Actor:
 
       # char attributes
       initial_hp   = 100.0
-      regeneration = 0.1
+      regeneration = 0.5
       magic_energy = 25.0
       
       # "puppetmaster"
@@ -362,7 +367,7 @@ class Actor:
           if self.accel:
             self.speed += self.timediff * self.accel
           if self.speed:
-            self.pos  += self.timediff * self.speed * self.world.get_field(OilField).v(self.pos)
+            self.pos  += self.timediff * self.speed * self.world.get_field(QuickField).v(self.pos)
           # effects of magic
           self.hp -= self.timediff * self.damage()
           if self.hp < self.initial_hp:
@@ -531,7 +536,7 @@ class MagicParticle(Actor):
           mult  = 0.0
           for caster in self.affects:
             affects = caster.affect_particle(self)
-            accel += affects[0]
+            accel += affects[0] * 5.0
             mult  += affects[1]
           self.accel = accel
           self.mult += (mult - self.mult) * self.mult_speed * self.timediff
@@ -544,29 +549,75 @@ class MagicParticle(Actor):
             else:
               self.deadtimer = self.world.time()
 
+
+# Temperature (fire-ice)
+# affects: life, speed
 class FireField(MagicField):
-      color = (255, 0, 0)
-class IceField(MagicField):
-      color = (0, 128, 255)
-class OilField(MagicField):
-      color = (32, 32, 48)
+      poscolor = (255, 0, 0)
+      negcolor = (0, 128, 255)
+
+# Quickness (water-earth)?
+# multiplier for movement speed - like "oiled up"
+class QuickField(MagicField):
+      poscolor = (192, 192, 192)
+      negcolor = (96, 32, 64)
       def v(self, pos):
           return 1.0 + self.particle_values(pos) + 0.01 * random()
+
+# Movement
+# constant speed acceleration - like "wind"
+class MoveField(MagicField):
+      poscolor = (128, 128, 128)
+      negcolor = (128, 128, 128)
+
+# regeneration/detoriation
+# direct hp effects - like health/sickness
+class LifeField(MagicField):
+      poscolor = (32, 224, 32)
+      negcolor = (0, 0, 0)
+
+# damage limitation/multiplication
+class GuardField(MagicField):
+      poscolor = (192, 192, 0)
+      negcolor = (192, 0, 192)
+
+# magic energy multiplier
+class EnergyField(MagicField):
+      poscolor = (192, 192, 255)
+      negcolor = (64, 64, 96)
+
+# visibility field - either invisible or visible from far away
+class SmokeField(MagicField):
+      poscolor = (128, 128, 192)
+      negcolor = (255, 255, 255)
+
 
 class FireBall(MagicParticle):
       sprite_names = ["fireball"]
       fieldtype    = FireField
+      fieldeffect  = +1
 class IceBall(MagicParticle):
       sprite_names = ["iceball"]
-      fieldtype    = IceField
-      #fieldtype    = FireField
-      #def get_params(self):
-      #    params = MagicParticle.get_params(self)
-      #    params[2] *= -1
-      #    return params
-class OilBall(MagicParticle):
-      sprite_names = ["oilball"]
-      fieldtype    = OilField
+      fieldtype    = FireField
+      fieldeffect  = -1
+class QuickBall(MagicParticle):
+      sprite_names = ["quickball"]
+      fieldtype    = QuickField
+      fieldeffect  = +1
+      anim_speed   = 6
+class SlowBall(MagicParticle):
+      sprite_names = ["quickball"]
+      fieldtype    = QuickField
+      fieldeffect  = -1
+      anim_speed   = 1
+class LifeBall(MagicParticle):
+      sprite_names = ["lifeball"]
+      fieldtype    = LifeField
+      fieldeffect  = +1
+class DeathBall(MagicParticle):
+      sprite_names = ["deathball"]
+      fieldtype    = LifeField
+      fieldeffect  = -1
 
 class Tree(Actor):
       sprite_names = ["tree"]
@@ -582,7 +633,7 @@ class Rabbit(Actor):
       const_speed  = 9.0
       anim_speed   = 2.0
       initial_hp   = 15
-      regeneration = 1.0
+      regeneration = 5.0
       sprite_names = ["rabbit-left", "rabbit-right"]
 
 class Dragon(Actor):
@@ -783,7 +834,9 @@ class Game:
           self.sprites = sprites = SpriteLoader()
           sprites.load("fire.png", "fireball", 25)
           sprites.load("ice.png", "iceball", 25)
-          sprites.load("oil.png", "oilball", 25)
+          sprites.load("death.png", "deathball", 25)
+          sprites.load("life.png", "lifeball", 25)
+          sprites.load("quick.png", "quickball", 25)
           sprites.load("dude.png", "dude-right", 25)
           sprites.load("dude.png", "dude-left", 25, flip = True)
           sprites.load("rabbit.png", "rabbit-right", 25)
@@ -794,14 +847,20 @@ class Game:
 
           # set up game objects
           self.view   = view   = View(screensize, (0, 0, 100, 2))
-          self.world  = world  = World(sprites, [FireField, IceField, OilField], view)
+          self.world  = world  = World(sprites, [FireField,
+                                                 QuickField,
+                                                 MoveField,
+                                                 LifeField,
+                                                 GuardField,
+                                                 EnergyField,
+                                                 SmokeField], view)
 
           for i in xrange(10):
             world.new_actor(Tree, -250 + 100 * i)
           world.new_actor(ControlledDragon, 70)
           world.new_actor(ControlledDragon, 75)
           world.new_actor(ControlledDragon, 80)
-          for i in xrange(15):
+          for i in xrange(25):
             world.new_actor(ControlledRabbit, 300 * random())
 
           # player-controlled object
@@ -937,8 +996,10 @@ class Game:
                   dude.magic.power_down(sel_magic)
                 elif sel_magic and event.key == pygame.K_r:
                   dude.magic.release(sel_magic)
+                  sel_magic == False
                 elif event.key == pygame.K_r:
                   dude.magic.release_all()
+                  sel_magic == False
 
                 # mode switching
                 elif event.key == pygame.K_TAB:
@@ -959,7 +1020,13 @@ class Game:
                   sel_magic = dude.magic.new(IceBall)
                   casting = False
                 elif cast_magic and event.key == pygame.K_c:
-                  sel_magic = dude.magic.new(OilBall)
+                  sel_magic = dude.magic.new(QuickBall)
+                  casting = False
+                elif cast_magic and event.key == pygame.K_v:
+                  sel_magic = dude.magic.new(DeathBall)
+                  casting = False
+                elif cast_magic and event.key == pygame.K_b:
+                  sel_magic = dude.magic.new(LifeBall)
                   casting = False
 
                 # toggle magic fields
@@ -968,7 +1035,11 @@ class Game:
                 elif event.key == pygame.K_x:
                   world.get_field(IceField).toggle_visibility()
                 elif event.key == pygame.K_c:
-                  world.get_field(OilField).toggle_visibility()
+                  world.get_field(QuickField).toggle_visibility()
+                elif event.key == pygame.K_v:
+                  world.get_field(DeathField).toggle_visibility()
+                elif event.key == pygame.K_b:
+                  world.get_field(LifeField).toggle_visibility()
 
                 # recapture existing particles
                 elif get_magic and event.key >= pygame.K_1 and event.key <= pygame.K_9:
