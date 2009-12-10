@@ -146,7 +146,7 @@ class World:
           self.actors.pop(self.actors.index(actor))
       def all_actors(self):
           return self.actors
-      def get_actors(self, x1 = False, x2 = False, filter = False):
+      def get_actors(self, x1 = False, x2 = False, filter = False, include = False, exclude = False):
           """
           Get actors with position in range [x1 : x2] and matching filter
           """
@@ -158,6 +158,23 @@ class World:
               continue
             if filter and not filter(actor):
               continue
+            if include:
+              decision = False
+              for klass in include:
+                if isinstance(actor, klass):
+                  decision = True
+                  break
+              if not decision:
+                continue
+            if exclude:
+              decision = True
+              for klass in exclude:
+                if isinstance(actor, klass):
+                  decision = False
+                  break
+              if not decision:
+                continue
+
             ret.append(actor)
           return ret
       def sort_actors(self):

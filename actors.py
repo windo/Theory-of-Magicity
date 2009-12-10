@@ -58,9 +58,9 @@ class MagicCaster:
           return self.change(particle, 1, set, diff)
       def change(self, particle, key, set, diff):
           if self.affects.has_key(particle):
-            if set:
+            if set is not False:
               self.affects[particle][key] = set
-            elif diff:
+            elif diff is not False:
               self.affects[particle][key] += diff
             else:
               return self.affects[particle][key]
@@ -137,8 +137,9 @@ class Actor:
           self.animate    = self.animate_stop
 
           # character params
-          self.hp     = self.initial_hp
-          self.magic  = MagicCaster(self, self.magic_energy)
+          self.hp    = self.initial_hp
+          self.magic = MagicCaster(self, self.magic_energy)
+          self.dead  = False
 
           # load images
           if self.directed:
@@ -208,12 +209,13 @@ class Actor:
           # effects of magic
           self.hp -= self.timediff * self.damage()
           if self.hp < self.initial_hp:
-            magic_regen = max(-self.EarthField.value(self.pos), 0) * 25.0
+            magic_regen = max(-self.EarthField.value(self.pos), 0) * 10.0
             self.hp += self.timediff * (self.regeneration + magic_regen)
           if self.hp > self.initial_hp:
             self.hp = self.initial_hp
           # death
           if self.hp <= 0 and self.initial_hp:
+            self.dead = True
             self.destroy()
           # controlled actors
           if self.controller:
@@ -304,6 +306,15 @@ class FSMController:
           if newstate != self.state:
             self.state       = newstate
             self.state_start = self.puppet.world.get_time()
+            self.action_time = 0.0
+
+      def time_passed(self, duration, rand = 0.0):
+          passed = self.puppet.world.get_time() - self.action_time
+          if passed > duration + rand * random():
+            self.action_time = self.puppet.world.get_time()
+            return True
+          else:
+            return False
 
       def state_time(self):
           return self.puppet.world.get_time() - self.state_start
@@ -344,7 +355,7 @@ class Rabbit(Actor):
       const_speed  = 9.0
       anim_speed   = 2.0
       initial_hp   = 15
-      regeneration = 5.0
+      regeneration = 2.0
       sprite_names = ["rabbit-left", "rabbit-right"]
 
 class Dragon(Actor):
@@ -352,13 +363,11 @@ class Dragon(Actor):
       sprite_names = ["dragon-left", "dragon-right"]
 
 class RabbitController(FSMController):
-      states = [ "idle", "jolt", "flee" ]
+      states = [ "idle", "flee" ]
       def state_change(self):
           if self.state == "idle":
-            if self.last_hp * 0.999 > self.puppet.hp:
-              self.set_state("jolt")
-          elif self.state == "jolt":
-            self.set_state("flee")
+            if self.last_hp * 0.99 > self.puppet.hp:
+              self.set_state("flee")
           elif self.state == "flee":
             if self.state_time() > 3.0:
               self.set_state("idle")
@@ -366,26 +375,29 @@ class RabbitController(FSMController):
       def state_action(self):
           if self.state == "idle":
             # move around randomly
-            if random() < 0.05:
-              decision = int(random() * 3) % 3
+            if self.time_passed(1.0, 2.0):
+              decision = int(random() * 4) % 4
               if decision == 0:
                 self.puppet.move_left()
               elif decision == 1:
                 self.puppet.move_right()
-              else:
+              elif decision == 2:
                 self.puppet.stop()
-          elif self.state == "jolt":
-            # reverse direction and start moving away from danger
-            if self.puppet.direction > 0:
-              self.puppet.move_left()
-            else:
-              self.puppet.move_right()
+              elif decision == 3:
+                if self.puppet.pos > 0:
+                  self.puppet.move_left()
+                else:
+                  self.puppet.move_right()
           elif self.state == "flee":
-            # continue the jolting direction
-            pass
+            # reverse direction and start moving away from danger
+            if self.time_passed(3.0):
+              if self.puppet.direction > 0:
+                self.puppet.move_left()
+              else:
+                self.puppet.move_right()
 
 class DragonController(FSMController):
-      states = [ "idle", "follow", "shoot", "evade" ]
+      states = [ "idle", "follow", "shoot", "evade", "heal" ]
       def __init__(self, puppet):
           FSMController.__init__(self, puppet)
           self.target = False
@@ -393,24 +405,43 @@ class DragonController(FSMController):
       def debug_info(self):
           return "%s target=%s" % (FSMController.debug_info(self), self.target)
 
-      def valid_target(self, actor):
-          if isinstance(actor, Rabbit): return True
-          if isinstance(actor, Dude): return True
-          return False
-      def acquire_target(self):
-          closest        = 75
-          pnew_target    = False
-          nearby_targets = self.puppet.world.get_actors(
-                           self.puppet.pos - closest,
-                           self.puppet.pos + closest,
-                           self.valid_target)
-          for actor in nearby_targets:
-            distance = abs(actor.pos - self.puppet.pos)
+      def nearby(self, dist, who):
+          closest = dist
+          found   = False
+          pos     = self.puppet.pos
+          candidates = self.puppet.world.get_actors(pos - dist, pos + dist, include = who)
+          for actor in candidates:
+            distance = abs(actor.pos - pos)
             if distance < closest:
-              closest    = distance
-              new_target = actor
+              closest = distance
+              found   = actor
+          return found
+      # look for nearby actors and decide who to attack
+      def acquire_target(self):
+          new_target = self.nearby(75, [Dude, Rabbit])
           if new_target:
-            self.target  = new_target
+            self.target = new_target
+      # look for nearby particles and decide which one to evade
+      def acquire_particle(self):
+          new_shot = self.nearby(5, [fields.MagicParticle])
+          if new_shot:
+            self.shot = new_shot
+            self.puppet.magic.capture(self.shot)
+          
+      def move_randomly(self):
+          decision = int(random() * 4) % 4
+          if decision == 0:
+            self.puppet.move_left()
+          elif decision == 1:
+            self.puppet.move_right()
+          elif decision == 2:
+            self.puppet.stop()
+          elif decision == 3:
+            if self.puppet.pos > 0:
+              self.puppet.move_left()
+            else:
+              self.puppet.move_right()
+
       def target_dist(self):
           return abs(self.target.pos - self.puppet.pos)
       def shot_dist(self):
@@ -418,17 +449,20 @@ class DragonController(FSMController):
           
       def state_change(self):
           if self.state == "idle":
-             if self.target:
-               self.set_state("follow")
-             elif self.shot:
+             if self.shot:
                self.set_state("evade")
+             elif self.puppet.hp < self.puppet.initial_hp * 0.75:
+               self.set_state("heal")
+             elif self.target:
+               self.set_state("follow")
 
           elif self.state == "follow":
-            if not self.target:
+            if self.state_time() > 3.0 or not self.target:
+              self.target = False
               self.set_state("idle")
             elif self.shot:
               self.set_state("evade")
-            elif self.state_time() > 3.0 and 50.0 > self.target_dist() > 25.0:
+            elif self.state_time() > 1.0 and (50.0 > self.target_dist() > 10.0):
               self.set_state("shoot")
 
           elif self.state == "shoot":
@@ -439,40 +473,45 @@ class DragonController(FSMController):
             if not self.shot:
               self.set_state("idle")
 
-      def move_randomly(self):
-          if random() < 0.05:
-            decision = int(random() * 3) % 3
-            if decision == 0:
-              self.puppet.move_left()
-            elif decision == 1:
-              self.puppet.move_right()
-            elif decision == 2:
-              self.puppet.stop()
+          elif self.state == "heal":
+            if self.state_time() > 10.0 or self.puppet.hp > self.puppet.initial_hp * 0.9:
+              self.set_state("idle")
 
       def state_action(self):
           if self.state == "idle":
-            self.move_randomly()
-            self.acquire_target()
+            if self.time_passed(2.0, 1.0):
+              self.move_randomly()
+              self.acquire_target()
+              self.acquire_particle()
 
           elif self.state == "follow":
-            if self.target.pos - self.puppet.pos > 50.0:
-              if self.target.pos > self.puppet.pos:
-                self.puppet.move_right()
+            self.acquire_particle()
+            if self.time_passed(1.0, 1.0):
+              if self.target.pos - self.puppet.pos > 50.0:
+                if self.target.pos > self.puppet.pos:
+                  self.puppet.move_right()
+                else:
+                  self.puppet.move_left()
+              elif self.target.pos - self.puppet.pos < 25.0:
+                if self.target.pos > self.puppet.pos:
+                  self.puppet.move_left()
+                else:
+                  self.puppet.move_right()
               else:
-                self.puppet.move_left()
-            elif self.target.pos - self.puppet.pos < 25.0:
-              if self.target.pos > self.puppet.pos:
-                self.puppet.move_left()
-              else:
-                self.puppet.move_right()
-            else:
-              self.move_randomly()
-            if self.state_time() > 15.0:
+                self.move_randomly()
+
+            # forget the dead
+            if self.target.dead:
               self.target = False
 
           elif self.state == "shoot":
             # fire the shot and set it moving
             if not self.shot:
+              if self.target.pos > self.puppet.pos:
+                self.puppet.move_right()
+              else:
+                self.puppet.move_left()
+              self.puppet.stop()
               self.shot = self.puppet.magic.new(fields.EarthBall)
               self.puppet.magic.power(self.shot, 10.0)
               if self.target.pos > self.shot.pos:
@@ -484,6 +523,29 @@ class DragonController(FSMController):
               self.puppet.magic.move(self.shot, 0.0)
               self.puppet.magic.release(self.shot)
               self.shot = False
+
+          elif self.state == "evade":
+            if self.shot_dist() > 10.0:
+              self.puppet.magic.release(self.shot)
+              self.shot = False
+            elif self.time_passed(1.0, 1.0):
+              if self.shot.pos > self.puppet.pos:
+                self.puppet.magic.move(self.shot, 3.0)
+                self.puppet.move_left()
+              else:
+                self.puppet.magic.move(self.shot, -3.0)
+                self.puppet.move_right()
+
+          elif self.state == "heal":
+            if not self.shot:
+              self.puppet.stop()
+              self.shot = self.puppet.magic.new(fields.EarthBall)
+              self.puppet.magic.power(self.shot, -10.0)
+
+            if self.shot.pos < self.puppet.pos:
+              self.puppet.magic.move(self.shot, 1.0)
+            else:
+              self.puppet.magic.move(self.shot, -1.0)
 
 class ControlledDragon(Dragon):
       control = DragonController
