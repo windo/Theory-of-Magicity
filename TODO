@@ -1,13 +1,11 @@
 Stuff to do, in order:
  * a working set of fields and balls
  * a (tutorial) level with a story
+ * title screen
  * sound effects
   * each field has a sound effect (or both positive and negative), volume determined by field strength
  * visual effects
   * background images
-  * each field has them
- * music
- * title screen
 
 Ideas:
  * ball actions

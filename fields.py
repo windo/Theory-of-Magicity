@@ -13,12 +13,14 @@ class MagicField:
       def __init__(self):
           self.visibility = False
           self.particles  = []
-
           self.font = pygame.font.SysFont("any", 14)
 
       # could be overloaded
       def value(self, pos):
-          return self.particle_values(pos) + 0.01 * random()
+          v = self.particle_values(pos) + 0.003 * random()
+          #if abs(v) > 0.2:
+          #  print (pos, v)
+          return v
 
       # add a new normal distribution
       def add_particle(self, particle):
@@ -59,15 +61,17 @@ class MagicField:
               # draw
               pygame.draw.line(screen, color, this, next)
               if pos % (self.drawpoints / 5) == 0:
-                value = self.value(view.sc2pl_x(pos))
-                txt   = "%s.value = %.2f" % (str(self.__class__).split(".")[1], value)
+                at    = view.sc2pl_x(pos * step)
+                val   = self.value(at)
+                txt   = "%s.value(%.2f:%.2f) = %.2f" % (str(self.__class__).split(".")[1], pos, at, val)
                 txt   = self.font.render(txt, False, (255, 255, 255))
                 screen.blit(txt, this)
               # move on
               this = next
 
 # Light
-# affects: time speed < health regen? > vision
+# affects: speed < health regen? > vision
+# TODO: vision effects
 class LightField(MagicField):
       basevalue = 0.0
       poscolor  = (192, 192, 255)
@@ -116,8 +120,12 @@ class MagicParticle(actors.Actor):
           self.affects = []
 
       def debug_info(self):
-          desc = actors.Actor.debug_info(self)
-          desc += "\nAffecting: %s: %s" % (", ".join([str(aff.actor) for aff in self.affects]))
+          desc  = actors.Actor.debug_info(self)
+          desc += "\nAffecting:\n"
+          for aff in self.affects:
+            name      = str(aff.actor)
+            acc, mult = aff.affect_particle(self)
+            desc += "%s: acc=%.2f, mult=%.2f\n" % (name, acc, mult)
           return desc
 
       # MagicCasters register to influence the particle
@@ -140,7 +148,7 @@ class MagicParticle(actors.Actor):
             caster.notify_destroy(self)
 
       def update(self):
-          Actor.update(self)
+          actors.Actor.update(self)
          
           # each caster can effect the particle
           accel = 0.0
@@ -153,12 +161,14 @@ class MagicParticle(actors.Actor):
           self.mult += (mult - self.mult) * self.mult_speed * self.timediff
 
           # if the power drops too low, terminate itself
-          if self.mult < 0.1:
+          if abs(self.mult) < 0.1:
             if self.deadtimer:
-              if self.deadtimer + 1.0 < self.world.time():
+              if self.deadtimer + 1.0 < self.world.get_time():
                 self.destroy()
             else:
-              self.deadtimer = self.world.time()
+              self.deadtimer = self.world.get_time()
+          else:
+            self.deadtimer = False
 
 
 class LightBall(MagicParticle):

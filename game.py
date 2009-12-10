@@ -169,6 +169,74 @@ class World:
       def all_fields(self):
           return self.fields.values()
 
+class Story:
+      def __init__(self, world):
+          self.world = world
+          # story state
+          self.state      = "begin"
+          self.state_time = self.world.get_time()
+          self.story_time = self.world.get_time()
+          # stories need narrations
+          self.narrations = {}
+
+      def narrate(self, text, duration = 10.0, id = False):
+          if not id: id = text
+          if self.narrations.has_key(id):
+            return
+          # render and put to narration list
+          img = self.world.bigfont.render(text, False, (255, 255, 255))
+          self.narrations[id] = (self.world.get_time(), duration, img)
+
+      def set_state(self, state):
+          self.state = state
+          self.state_time = self.world.get_time()
+      
+      def times(self):
+          now = self.world.get_time()
+          return now - self.story_time, now - self.state_time
+
+      # must overload this
+      def update(self):
+          pass
+
+      def draw(self, screen):
+          # proccess narratives
+          draw_list = []
+          for id in self.narrations.keys():
+            show_time, duration, img = self.narrations[id]
+            if show_time + duration < self.world.get_time():
+              del self.narrations[id]
+            else:
+              draw_list.append((int(show_time), img))
+          draw_list.sort(lambda x, y: y[0] - x[0])
+          # draw them
+          line_y = 10
+          for show_time, img in draw_list:
+            screen.blit(img, (10, line_y))
+            line_y += img.get_height() + 5
+
+class Tutorial(Story):
+      def update(self):
+          story_time, state_time = self.times()
+          # intro
+          if self.state == "begin":
+            if state_time < 5.0:
+              self.narrate("These rabbits are being slaughtered by the dragons...")
+            elif state_time < 6.0:
+              self.narrate("I shall to protect them.")
+            elif state_time < 7.0:
+              self.narrate("Guide me!")
+              self.set_state("tutorial1")
+
+          # explain the controls
+          elif self.state == "tutorial1":
+            if state_time < 10.0:
+              pass
+            elif state_time < 13.0:
+              self.narrate("Let's get away from the dragons first [use arrow keys].")
+            elif state_time < 15.0:
+              self.narrate("The left direction seems a bit safer.")
+
 class Game:
       def __init__(self):
           # initialize pygame
@@ -178,7 +246,9 @@ class Game:
           #pygame.mixer.music.load("music/warmarch2.ogg")
           #pygame.mixer.music.play(-1)
           pygame.display.set_caption('Magic')
-          screensize  = (1200, 300)
+          #screensize  = (1024, 768)
+          #self.screen = pygame.display.set_mode(screensize, pygame.FULLSCREEN)
+          screensize  = (1000, 400)
           self.screen = pygame.display.set_mode(screensize)
           self.clock  = pygame.time.Clock()
 
@@ -196,13 +266,23 @@ class Game:
           sprites.load("dragon.png", "dragon-right", 25)
           sprites.load("dragon.png", "dragon-left", 25, flip = True)
           sprites.load("tree.png", "tree")
+          sprites.load("explosion.png", "explosion")
+          sprites.load("ashes.png", "ashes", 100)
 
           # set up game objects
           self.view   = view   = View(screensize, (0, 0, 100, 2))
           self.world  = world  = World(sprites, fields.all, view)
+          self.story  = Tutorial(world)
 
+          # scenery
           for i in xrange(10):
-            world.new_actor(actors.Tree, -250 + 100 * i)
+            world.new_actor(actors.Tree, -250 + (500 / 10) * i + random() * 25)
+          for i in xrange(5):
+            world.new_actor(actors.Explosion, -250 + (500 / 5) * i + random() * 25)
+          for i in xrange(25):
+            world.new_actor(actors.Ashes, -250 + (500 / 25) * i + random() * 25)
+
+          # enemies
           world.new_actor(actors.ControlledDragon, 70)
           world.new_actor(actors.ControlledDragon, 75)
           world.new_actor(actors.ControlledDragon, 80)
@@ -250,6 +330,9 @@ class Game:
               for actor in world.all_actors():
                 actor.update()
             update_actor_time = time.time() - stime
+
+            # storyline evolving
+            self.story.update()
           
             # center view to dude
             if not free_camera:
@@ -301,6 +384,9 @@ class Game:
             # draw dude's magic (magic selection)
             if sel_magic:
               pygame.draw.circle(screen, (255, 255, 255), (view.pl2sc_x(sel_magic.pos), view.sc_h() - 40), 25, 1)
+            # draw storyline elements
+            self.story.draw(screen)
+            # drawing done!
             pygame.display.update()
           
             # handle events
@@ -333,13 +419,13 @@ class Game:
           
                 # magic moving
                 elif sel_magic and event.key == pygame.K_a:
-                  dude.magic.move_left(sel_magic)
+                  dude.magic.move(sel_magic, -3.0)
                 elif sel_magic and event.key == pygame.K_d:
-                  dude.magic.move_right(sel_magic)
+                  dude.magic.move(sel_magic, 3.0)
                 elif sel_magic and event.key == pygame.K_w:
-                  dude.magic.power_up(sel_magic)
+                  dude.magic.power(sel_magic, diff = 3.0)
                 elif sel_magic and event.key == pygame.K_s:
-                  dude.magic.power_down(sel_magic)
+                  dude.magic.power(sel_magic, diff = -3.0)
                 elif sel_magic and event.key == pygame.K_r:
                   dude.magic.release(sel_magic)
                   sel_magic == False
@@ -411,9 +497,9 @@ class Game:
 
                 # magic movement
                 elif event.key == pygame.K_a and sel_magic:
-                  dude.magic.stop(sel_magic)
+                  dude.magic.move(sel_magic, 0.0)
                 elif event.key == pygame.K_d and sel_magic:
-                  dude.magic.stop(sel_magic)
+                  dude.magic.move(sel_magic, 0.0)
 
                 # input modes
                 elif event.key == pygame.K_LSHIFT:
