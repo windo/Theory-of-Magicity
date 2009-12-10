@@ -7,7 +7,7 @@ from operator import attrgetter
 import pygame
 from pygame.locals import *
 
-import core, actors, fields, particles
+import actors, fields
 
 class SpriteLoader:
       """
@@ -291,7 +291,7 @@ class Game:
             # draw magic selection
             if get_magic:
               i = 1
-              local_balls = self.world.get_actors(dude.pos - 100, dude.pos + 100, lambda x: isinstance(x, particles.MagicParticle))
+              local_balls = self.world.get_actors(dude.pos - 100, dude.pos + 100, lambda x: isinstance(x, fields.MagicParticle))
               for ball in local_balls:
                 ball_txt = world.font.render("%u: %s" % (i, str(ball)), False, ball.field.poscolor)
                 ball_nr  = world.bigfont.render("%u" % (i), False, ball.field.poscolor)
@@ -360,32 +360,22 @@ class Game:
                 
                 # cast_magic & fields
                 elif cast_magic and event.key == pygame.K_z:
-                  sel_magic = dude.magic.new(particles.FireBall)
+                  sel_magic = dude.magic.new(fields.LightBall)
                   casting = False
                 elif cast_magic and event.key == pygame.K_x:
-                  sel_magic = dude.magic.new(particles.IceBall)
+                  sel_magic = dude.magic.new(fields.EnergyBall)
                   casting = False
                 elif cast_magic and event.key == pygame.K_c:
-                  sel_magic = dude.magic.new(particles.QuickBall)
-                  casting = False
-                elif cast_magic and event.key == pygame.K_v:
-                  sel_magic = dude.magic.new(particles.DeathBall)
-                  casting = False
-                elif cast_magic and event.key == pygame.K_b:
-                  sel_magic = dude.magic.new(particles.LifeBall)
+                  sel_magic = dude.magic.new(fields.EarthBall)
                   casting = False
 
                 # toggle magic fields
                 elif event.key == pygame.K_z:
-                  world.get_field(fields.FireField).toggle_visibility()
+                  world.get_field(fields.LightField).toggle_visibility()
                 elif event.key == pygame.K_x:
-                  world.get_field(fields.IceField).toggle_visibility()
+                  world.get_field(fields.EnergyField).toggle_visibility()
                 elif event.key == pygame.K_c:
-                  world.get_field(fields.QuickField).toggle_visibility()
-                elif event.key == pygame.K_v:
-                  world.get_field(fields.DeathField).toggle_visibility()
-                elif event.key == pygame.K_b:
-                  world.get_field(fields.LifeField).toggle_visibility()
+                  world.get_field(fields.EarthField).toggle_visibility()
 
                 # recapture existing particles
                 elif get_magic and event.key >= pygame.K_1 and event.key <= pygame.K_9:
