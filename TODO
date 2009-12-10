@@ -4,12 +4,29 @@ Stuff to do, in order:
  * sound effects
   * each field has a sound effect (or both positive and negative), volume determined by field strength
  * visual effects
+  * background images
   * each field has them
  * music
  * title screen
 
 Ideas:
- * no balls as such, each field draws their own effects?
+ * ball actions
+  * merge/split - when low tension, forces not opposing
+  * release/acquire - always
+  * movement/shape - always
+ * field effects
+  * force vs speed?
+   * speed - time multiplier
+   * force - added constant
+  * left-right direction?
+  * vision?
+   * no - wrong - ok - duplicate - farther
+   * light/darkness?
+  * stats
+   * health
+   * movement
+   * energy
+ * no ball pictures, each field draws their own effects?
  * language
   * magic can be written in a language, spells written and read
   * magic casters (NPCs) can be scripted
