@@ -139,6 +139,28 @@ class MagicParticle(actors.Actor):
           for caster in self.affects:
             caster.notify_destroy(self)
 
+      def update(self):
+          Actor.update(self)
+         
+          # each caster can effect the particle
+          accel = 0.0
+          mult  = 0.0
+          for caster in self.affects:
+            affects = caster.affect_particle(self)
+            accel += affects[0]
+            mult  += affects[1]
+          self.accel = accel
+          self.mult += (mult - self.mult) * self.mult_speed * self.timediff
+
+          # if the power drops too low, terminate itself
+          if self.mult < 0.1:
+            if self.deadtimer:
+              if self.deadtimer + 1.0 < self.world.time():
+                self.destroy()
+            else:
+              self.deadtimer = self.world.time()
+
+
 class LightBall(MagicParticle):
       sprite_names = ["iceball"]
       fieldtype    = LightField
