@@ -10,9 +10,8 @@ class MagicCaster:
       """
       magic_distance = 5.0
 
-      def __init__(self, actor, magic_energy):
+      def __init__(self, actor):
           self.actor   = actor
-          self.energy  = magic_energy
           self.used    = 0.0
           self.affects = {}
 
@@ -68,6 +67,8 @@ class MagicCaster:
           if not (set or diff):
             return 0.0
 
+      def energy(self):
+          return self.actor.magic_energy
       def balance_energy(self):
           """
           go over the list of affects and make sure we stay within
@@ -76,8 +77,8 @@ class MagicCaster:
           used = 0.0
           for speed, power in self.affects.values():
             used += abs(speed) + abs(power)
-          if used > self.energy:
-            ratio = self.energy / used
+          if used > self.energy():
+            ratio = self.energy() / used
             for affect in self.affects.keys():
               speed, power = self.affects[affect]
               speed *= ratio
@@ -86,7 +87,7 @@ class MagicCaster:
             corrected = 0.0
             for speed, power in self.affects.values():
               corrected += abs(speed) + abs(power)
-            #print "used=%.1f > total=%.1f -> ratio=%.2f: corrected=%.1f" % (used, self.energy, ratio, corrected)
+            #print "used=%.1f > total=%.1f -> ratio=%.2f: corrected=%.1f" % (used, self.energy(), ratio, corrected)
 
       # called by particles
       def affect_particle(self, particle):
@@ -104,12 +105,14 @@ class Actor:
       animate_stop = False
       anim_speed   = 1.0
       hover_height = 0.0
+      base_height  = 0.0
       directed     = True
+      from_ceiling = False
 
       # char attributes
-      initial_hp   = 100.0
-      regeneration = 0.5
-      magic_energy = 10.0
+      initial_hp     = 100.0
+      regeneration   = 0.5
+      initial_energy = 10.0
       
       # "puppetmaster"
       control        = None
@@ -137,9 +140,10 @@ class Actor:
           self.animate    = self.animate_stop
 
           # character params
-          self.hp    = self.initial_hp
-          self.magic = MagicCaster(self, self.magic_energy)
-          self.dead  = False
+          self.hp           = self.initial_hp
+          self.magic_energy = self.initial_energy
+          self.magic        = MagicCaster(self)
+          self.dead         = False
 
           # load images
           if self.directed:
@@ -204,12 +208,15 @@ class Actor:
           if self.const_speed or self.const_accel:
             self.speed += self.timediff * self.accel
             magic_speed = self.EnergyField.value(self.pos) * 10.0
-            magic_mult  = self.LightField.value(self.pos) * 10.0 + 1.0
+            magic_mult  = self.LightField.value(self.pos) * 5.0 + 1.0
             self.pos   += magic_mult * self.timediff * (self.speed + magic_speed)
-          # effects of magic
-          self.hp -= self.timediff * self.damage()
+          # update hp
+          light_damage  = abs(self.LightField.value(self.pos))    * 10.0
+          energy_damage = abs(self.EnergyField.value(self.pos))   * 10.0
+          earth_damage  = max(self.EarthField.value(self.pos), 0) * 25.0
+          self.hp -= self.timediff * (light_damage + energy_damage + earth_damage)
           if self.hp < self.initial_hp:
-            magic_regen = max(-self.EarthField.value(self.pos), 0) * 10.0
+            magic_regen = max(-self.EarthField.value(self.pos), 0) * 12.5
             self.hp += self.timediff * (self.regeneration + magic_regen)
           if self.hp > self.initial_hp:
             self.hp = self.initial_hp
@@ -217,15 +224,12 @@ class Actor:
           if self.hp <= 0 and self.initial_hp:
             self.dead = True
             self.destroy()
+          # set magic energy
+          magic_mult = self.EarthField.value(self.pos) / 2.0 + 1.0
+          self.magic_energy = magic_mult * self.initial_energy
           # controlled actors
           if self.controller:
             self.controller.update()
-      # different Actors can implement their own way of changing their hp
-      def damage(self):
-          light_damage  = abs(self.LightField.value(self.pos))    * 10.0
-          energy_damage = abs(self.EnergyField.value(self.pos))   * 10.0
-          earth_damage  = max(self.EarthField.value(self.pos), 0) * 25.0
-          return light_damage + energy_damage + earth_damage
       
       # draw image, either left-right directed or unidirectional
       def draw(self, view, screen, draw_hp = False, draw_debug = False):
@@ -257,7 +261,7 @@ class Actor:
 
           # actual drawing
           img = imglist[self.cur_img_idx]
-          coords = (view.pl2sc_x(self.pos) - self.img_w / 2, view.sc_h() - self.img_h - hover)
+          coords = (view.pl2sc_x(self.pos) - self.img_w / 2, view.sc_h() - self.img_h - hover - self.base_height)
           screen.blit(img, coords)
 
           # draw hp bar
@@ -337,14 +341,7 @@ class Explosion(Actor):
       sprite_names = ["explosion"]
       directed     = False
       initial_hp   = 0
-      hover_height = 300
-class Ashes(Actor):
-      sprite_names = ["ashes"]
-      directed     = False
-      initial_hp   = 0
-      hover_height = 400
-      animate_stop = True
-      anim_speed   = 3.0
+      base_height  = 300
 
 class Dude(Actor):
       const_speed  = 4.0

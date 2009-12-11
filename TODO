@@ -1,6 +1,6 @@
 Stuff to do, in order:
- * a working set of fields and balls
  * a (tutorial) level with a story
+ * sanitize the debugging output
  * title screen
  * sound effects
   * each field has a sound effect (or both positive and negative), volume determined by field strength

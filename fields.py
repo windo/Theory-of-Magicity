@@ -46,7 +46,7 @@ class MagicField:
       # Get the field's value at pos as translated through the view
       def sc_value(self, view, pos):
           return pos, view.pl2sc_y(self.value(view.sc2pl_x(pos)) + 1.0)
-      def draw(self, view, screen):
+      def draw(self, view, screen, draw_debug = False):
           if self.visibility:
             # step should be float to cover the whole range
             step = float(screen.get_width()) / float(self.drawpoints)
@@ -59,13 +59,14 @@ class MagicField:
               if this > 0.0: color = self.poscolor
               else: color = self.negcolor
               # draw
-              pygame.draw.line(screen, color, this, next)
-              if pos % (self.drawpoints / 5) == 0:
-                at    = view.sc2pl_x(pos * step)
-                val   = self.value(at)
-                txt   = "%s.value(%.2f:%.2f) = %.2f" % (str(self.__class__).split(".")[1], pos, at, val)
-                txt   = self.font.render(txt, False, (255, 255, 255))
-                screen.blit(txt, this)
+              pygame.draw.line(screen, color, this, next, 3)
+              if draw_debug:
+                if pos % (self.drawpoints / 5) == 0:
+                  at    = view.sc2pl_x(pos * step)
+                  val   = self.value(at)
+                  txt   = "%s.value(%.2f:%.2f) = %.2f" % (str(self.__class__).split(".")[1], pos, at, val)
+                  txt   = self.font.render(txt, False, (255, 255, 255))
+                  screen.blit(txt, this)
               # move on
               this = next
 
@@ -99,7 +100,7 @@ class MagicParticle(actors.Actor):
       const_accel  = 5.0
       animate_stop = True
       anim_speed   = 3.0
-      hover_height = 25.0
+      hover_height = 50.0
       initial_hp   = 0
       directed     = False
 
@@ -127,6 +128,11 @@ class MagicParticle(actors.Actor):
             acc, mult = aff.affect_particle(self)
             desc += "%s: acc=%.2f, mult=%.2f\n" % (name, acc, mult)
           return desc
+
+      def draw_selection(self, screen):
+          pygame.draw.circle(screen, self.field.poscolor,
+                             (self.world.view.pl2sc_x(self.pos), self.world.view.sc_h() - 40),
+                             25, 1)
 
       # MagicCasters register to influence the particle
       def affect(self, caster):
@@ -157,7 +163,7 @@ class MagicParticle(actors.Actor):
             affects = caster.affect_particle(self)
             accel += affects[0]
             mult  += affects[1]
-          self.accel = accel
+          self.accel = accel * 3.0
           self.mult += (mult - self.mult) * self.mult_speed * self.timediff
 
           # if the power drops too low, terminate itself
@@ -175,8 +181,8 @@ class LightBall(MagicParticle):
       sprite_names = ["iceball"]
       fieldtype    = LightField
 class EnergyBall(MagicParticle):
-      sprite_names = ["fireball"]
+      sprite_names = ["ashes"]
       fieldtype    = EnergyField
 class EarthBall(MagicParticle):
-      sprite_names = ["lifeball"]
+      sprite_names = ["fireball"]
       fieldtype    = EarthField
