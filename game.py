@@ -540,6 +540,8 @@ class Game:
           # screen params
           screensize  = (1024, 768)
           self.screen = pygame.display.set_mode(screensize, pygame.FULLSCREEN)
+          #screensize  = (800, 600)
+          #self.screen = pygame.display.set_mode(screensize)
           self.view   = View(screensize, (0, 0, 100, 2))
 
           # loading sprites

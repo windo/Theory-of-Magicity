@@ -1,7 +1,9 @@
 Stuff to do, in order:
  * sound effects
   * creature sounds
-  * each field has a sound effect (or both positive and negative), volume determined by field strength
+   * should not be so lowsy
+  * each field/ball has a sound effect
+ * third level
  * visual effects
   * background images
 
