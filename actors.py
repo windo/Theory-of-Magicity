@@ -24,8 +24,8 @@ class MagicCaster:
           # make a new particle
           pos = self.actor.pos + self.actor.direction * self.magic_distance
           particle = self.actor.world.new_actor(particletype, pos)
-          # register to influence it [mult, speed]
-          self.affects[particle] = [0.0, 0.0]
+          # register to influence it [speed, mult]
+          self.affects[particle] = [0.0, 1.0]
           particle.affect(self)
           # return it to the caller
           return particle
@@ -108,6 +108,7 @@ class Actor:
       base_height  = 0.0
       directed     = True
       from_ceiling = False
+      snd_move     = []
 
       # char attributes
       initial_hp     = 100.0
@@ -138,6 +139,7 @@ class Actor:
           self.rnd_time_offset = random() * 25.0
           self.direction  = -1
           self.animate    = self.animate_stop
+          self.next_sound = 0.0
 
           # character params
           self.hp           = self.initial_hp
@@ -147,13 +149,13 @@ class Actor:
 
           # load images
           if self.directed:
-            self.img_left  = world.sprites.get(self.sprite_names[0])
-            self.img_right = world.sprites.get(self.sprite_names[1])
+            self.img_left  = world.loader.get_spritelist(self.sprite_names[0])
+            self.img_right = world.loader.get_spritelist(self.sprite_names[1])
             self.img_count = len(self.img_left)
             self.img_w     = self.img_left[0].get_width()
             self.img_h     = self.img_left[0].get_height()
           else:
-            self.img_list  = world.sprites.get(self.sprite_names[0])
+            self.img_list  = world.loader.get_spritelist(self.sprite_names[0])
             self.img_count = len(self.img_list)
             self.img_w     = self.img_list[0].get_width()
             self.img_h     = self.img_list[0].get_height()
@@ -176,6 +178,21 @@ class Actor:
             desc += "\nController: %s" % (self.controller.debug_info())
           return desc
 
+      # play sounds
+      def in_range(self):
+          return self.pos > self.world.view.pl_x1() and self.pos < self.world.view.pl_x2()
+      def movement_sound(self):
+          if self.snd_move and self.in_range() and self.next_sound < self.world.get_time():
+            self.next_sound = self.world.get_time() + 1.0 + random()
+            count = len(self.snd_move)
+            sound = self.snd_move[int(random() * count)]
+            self.world.loader.play_sound(sound)
+      def death_sound(self):
+          if self.snd_death and self.in_range():
+            count = len(self.snd_death)
+            sound = self.snd_death[int(random() * count)]
+            self.world.loader.play_sound(sound)
+
       # moving the actor
       def move_left(self):
           if not self.const_accel:
@@ -184,6 +201,7 @@ class Actor:
             self.accel   = -self.const_accel
           self.animate   = True
           self.direction = -1
+          self.movement_sound()
       def move_right(self):
           if not self.const_accel:
             self.speed   = self.const_speed
@@ -191,6 +209,7 @@ class Actor:
             self.accel   = self.const_accel
           self.animate   = True
           self.direction = 1
+          self.movement_sound()
       def stop(self):
           if not self.const_accel:
             self.speed   = 0
@@ -208,8 +227,15 @@ class Actor:
           if self.const_speed or self.const_accel:
             self.speed += self.timediff * self.accel
             magic_speed = self.EnergyField.value(self.pos) * 10.0
-            magic_mult  = self.LightField.value(self.pos) * 5.0 + 1.0
+            magic_mult  = self.LightField.value(self.pos)
+            if magic_mult > 0:
+              magic_mult *= 5.0
+            else:
+              magic_mult *= 1.0
+            magic_mult   += 1.0
             self.pos   += magic_mult * self.timediff * (self.speed + magic_speed)
+            if self.animate:
+              self.movement_sound()
           # update hp
           light_damage  = abs(self.LightField.value(self.pos))    * 10.0
           energy_damage = abs(self.EnergyField.value(self.pos))   * 10.0
@@ -223,6 +249,7 @@ class Actor:
           # death
           if self.hp <= 0 and self.initial_hp:
             self.dead = True
+            self.death_sound()
             self.destroy()
           # set magic energy
           magic_mult = self.EarthField.value(self.pos) / 2.0 + 1.0
@@ -276,10 +303,10 @@ class Actor:
             lines = self.debug_info().split("\n")
             txts  = []
             for line in lines:
-              txts.append(self.world.font.render(line, False, (255, 255, 255)))
+              txts.append(self.world.loader.debugfont.render(line, True, (255, 255, 255)))
             i = 0
             for txt in txts:
-              screen.blit(txt, (view.pl2sc_x(self.pos) - img.get_width() / 2, int(draw_debug) + 20 + i * 10))
+              screen.blit(txt, (view.pl2sc_x(self.pos) - img.get_width() / 2, int(draw_debug) + 20 + i * 20))
               i += 1
 
 import fields
@@ -337,16 +364,18 @@ class Tree(Actor):
       sprite_names = ["tree"]
       directed     = False
       initial_hp   = 0
-class Explosion(Actor):
-      sprite_names = ["explosion"]
+class Sun(Actor):
+      sprite_names = ["sun"]
       directed     = False
       initial_hp   = 0
       base_height  = 300
 
 class Dude(Actor):
-      const_speed  = 4.0
+      const_speed  = 6.0
       initial_hp   = 100
       sprite_names = ["dude-left", "dude-right"]
+      snd_move     = ["step", "cape1", "cape2"]
+      snd_death    = ["cry"]
 
 class Rabbit(Actor):
       const_speed  = 9.0
@@ -354,13 +383,89 @@ class Rabbit(Actor):
       initial_hp   = 15
       regeneration = 2.0
       sprite_names = ["rabbit-left", "rabbit-right"]
+      snd_move     = ["jump"]
+      snd_death    = ["beep1", "beep2"]
 
 class Dragon(Actor):
       const_speed  = 2.0
       sprite_names = ["dragon-left", "dragon-right"]
+      snd_move     = ["crackle1", "crackle2"]
+      snd_death    = ["moan1", "moan2"]
+
+class Guardian(Actor):
+      const_speed    = 0.5
+      initial_hp     = 250
+      regeneration   = 2.0
+      initial_energy = 20.0
+      sprite_names = ["guardian-left", "guardian-right"]
+
+class GuardianController(FSMController):
+      states = [ "idle", "guarding" ]
+      def __init__(self, puppet):
+          FSMController.__init__(self, puppet)
+          self.target = False
+          self.shot   = False
+
+      def state_change(self):
+          if self.state == "idle":
+            if self.time_passed(2.0):
+              dude = self.puppet.world.get_actors(self.puppet.pos - 75, self.puppet.pos + 75, include = [ Dude ])
+              if dude:
+                self.target = dude[0]
+                self.set_state("guarding")
+
+          elif self.state == "guarding":
+            if self.target.dead or abs(self.target.pos - self.puppet.pos) > 100:
+              self.target = False
+              if self.shot:
+                self.puppet.magic.release(self.shot)
+                self.shot = False
+              self.set_state("idle")
+
+      def state_action(self):
+          if self.state == "idle":
+            pass
+          elif self.state == "guarding":
+            # face the direction
+            if self.target.pos < self.puppet.pos:
+              if self.puppet.direction > 0:
+                self.puppet.move_left()
+                self.puppet.stop()
+            else:
+              if self.puppet.direction < 0:
+                self.puppet.move_right()
+                self.puppet.stop()
+
+            # block the path
+            if not self.shot or self.shot.dead:
+              self.shot = self.puppet.magic.new(fields.LightBall)
+
+            # shot position
+            if self.target.pos < self.puppet.pos:
+              dest_pos = self.puppet.pos - 20.0
+            else:
+              dest_pos = self.puppet.pos + 20.0
+
+            offset = abs(self.shot.pos - dest_pos)
+            if offset > 1.0:
+              self.puppet.magic.power(self.shot, 0.0)
+              if self.shot.pos + self.shot.speed > dest_pos:
+                self.puppet.magic.move(self.shot, -self.puppet.magic_energy)
+              elif self.shot.pos + self.shot.speed < dest_pos:
+                self.puppet.magic.move(self.shot, self.puppet.magic_energy)
+
+            # Field value
+            if offset < 3.0:
+              value      = self.puppet.LightField.value(self.shot.pos)
+              dest_value = -1.0
+              if value < dest_value:
+                self.puppet.magic.power(self.shot, self.puppet.magic_energy)
+              elif value > dest_value:
+                self.puppet.magic.power(self.shot, -self.puppet.magic_energy)
 
 class RabbitController(FSMController):
-      states = [ "idle", "flee" ]
+      states   = [ "idle", "flee" ]
+      waypoint = 25.0
       def state_change(self):
           if self.state == "idle":
             if self.last_hp * 0.99 > self.puppet.hp:
@@ -381,7 +486,7 @@ class RabbitController(FSMController):
               elif decision == 2:
                 self.puppet.stop()
               elif decision == 3:
-                if self.puppet.pos > 0:
+                if self.puppet.pos > self.waypoint:
                   self.puppet.move_left()
                 else:
                   self.puppet.move_right()
@@ -397,8 +502,9 @@ class DragonController(FSMController):
       states = [ "idle", "follow", "shoot", "evade", "heal" ]
       def __init__(self, puppet):
           FSMController.__init__(self, puppet)
-          self.target = False
-          self.shot   = False
+          self.target   = False
+          self.shot     = False
+          self.waypoint = 25.0
       def debug_info(self):
           return "%s target=%s" % (FSMController.debug_info(self), self.target)
 
@@ -434,7 +540,7 @@ class DragonController(FSMController):
           elif decision == 2:
             self.puppet.stop()
           elif decision == 3:
-            if self.puppet.pos > 0:
+            if self.puppet.pos > self.waypoint:
               self.puppet.move_left()
             else:
               self.puppet.move_right()
@@ -464,6 +570,9 @@ class DragonController(FSMController):
 
           elif self.state == "shoot":
             if self.state_time() > 5.0 or not self.shot:
+              if self.shot:
+                self.puppet.magic.release(self.shot)
+                self.shot = False
               self.set_state("follow")
 
           elif self.state == "evade":
@@ -516,10 +625,10 @@ class DragonController(FSMController):
               else:
                 self.puppet.magic.move(self.shot, -3.0)
 
-            if self.shot_dist() > self.target_dist() / 3.0 * 2.0:
-              self.puppet.magic.move(self.shot, 0.0)
-              self.puppet.magic.release(self.shot)
-              self.shot = False
+            if self.shot.pos + self.shot.speed > self.target.pos:
+              self.puppet.magic.move(self.shot, -3.0)
+            else:
+              self.puppet.magic.move(self.shot, 3.0)
 
           elif self.state == "evade":
             if self.shot_dist() > 10.0:
@@ -539,7 +648,7 @@ class DragonController(FSMController):
               self.shot = self.puppet.magic.new(fields.EarthBall)
               self.puppet.magic.power(self.shot, -10.0)
 
-            if self.shot.pos < self.puppet.pos:
+            if self.shot.pos + self.shot.speed < self.puppet.pos:
               self.puppet.magic.move(self.shot, 1.0)
             else:
               self.puppet.magic.move(self.shot, -1.0)
@@ -548,3 +657,5 @@ class ControlledDragon(Dragon):
       control = DragonController
 class ControlledRabbit(Rabbit):
       control = RabbitController
+class ControlledGuardian(Guardian):
+      control = GuardianController

@@ -1,8 +1,6 @@
 Stuff to do, in order:
- * a (tutorial) level with a story
- * sanitize the debugging output
- * title screen
  * sound effects
+  * creature sounds
   * each field has a sound effect (or both positive and negative), volume determined by field strength
  * visual effects
   * background images

@@ -10,10 +10,10 @@ class MagicField:
       drawpoints = 150
       basevalue  = 0.0
 
-      def __init__(self):
+      def __init__(self, loader):
           self.visibility = False
           self.particles  = []
-          self.font = pygame.font.SysFont("any", 14)
+          self.loader  = loader
 
       # could be overloaded
       def value(self, pos):
@@ -65,7 +65,7 @@ class MagicField:
                   at    = view.sc2pl_x(pos * step)
                   val   = self.value(at)
                   txt   = "%s.value(%.2f:%.2f) = %.2f" % (str(self.__class__).split(".")[1], pos, at, val)
-                  txt   = self.font.render(txt, False, (255, 255, 255))
+                  txt   = self.loader.debugfont.render(txt, True, (255, 255, 255))
                   screen.blit(txt, this)
               # move on
               this = next
@@ -81,8 +81,8 @@ class LightField(MagicField):
 # Energy
 # affects: right < health regen? > left
 class EnergyField(MagicField):
-      poscolor = (255, 255, 192)
-      negcolor = (0, 0, 64)
+      poscolor = (255, 255, 128)
+      negcolor = (0, 0, 128)
 
 # Earth
 # affects: energy regen <-> health regen
@@ -115,6 +115,7 @@ class MagicParticle(actors.Actor):
           self.dev       = self.base_dev
           self.mult      = 1.0
           self.deadtimer = False
+          self.dead      = False
           self.field.add_particle(self)
 
           # actors who are influencing this particle
@@ -170,6 +171,7 @@ class MagicParticle(actors.Actor):
           if abs(self.mult) < 0.1:
             if self.deadtimer:
               if self.deadtimer + 1.0 < self.world.get_time():
+                self.dead = True
                 self.destroy()
             else:
               self.deadtimer = self.world.get_time()
