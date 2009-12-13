@@ -17,15 +17,7 @@ except ImportError, message:
     raise SystemExit,  "Unable to load module. %s" % message
  
 class pygame2exe(py2exe.build_exe.py2exe): 
-    # This hack make sure that pygame default font is copied: no need to modify code for specifying default font
-    def copy_extensions(self, extensions):
-        #Get pygame default font
-        pygamedir = os.path.split(pygame.base.__file__)[0]
-        pygame_default_font = os.path.join(pygamedir, pygame.font.get_default_font())
- 
-        #Add font to list of extension to be copied
-        extensions.append(Module("pygame.font", pygame_default_font))
-        py2exe.build_exe.py2exe.copy_extensions(self, extensions)
+      pass
  
 class BuildExe:
     def __init__(self):
@@ -33,7 +25,7 @@ class BuildExe:
         self.script = "game.py"
  
         #Name of program
-        self.project_name = "MagicField"
+        self.project_name = "Theory of Magicity"
  
         #Project url
         self.project_url = "about:none"
@@ -42,24 +34,24 @@ class BuildExe:
         self.project_version = "0.0"
  
         #License of the program
-        self.license = "MyApps License"
+        self.license = "GPLv2"
  
         #Auhor of program
-        self.author_name = "Me"
-        self.author_email = "example@example.com"
-        self.copyright = "Copyright (c) 2009 Me."
+        self.author_name = "Siim Po~der"
+        self.author_email = "siim@p6drad-teel.net"
+        self.copyright = "Copyright (c) 2009 Siim Po~der."
  
         #Description
-        self.project_description = "MyApps Description"
+        self.project_description = "A game about world with physics-like magic."
  
         #Icon file (None will use pygame default icon)
         self.icon_file = None
  
         #Extra files/dirs copied to game
-        self.extra_datas = []
+        self.extra_datas = ['img', 'sound', 'font', 'music']
  
         #Extra/excludes python modules
-        self.extra_modules = [ "random", "pygame" ]
+        self.extra_modules = []
         self.exclude_modules = []
         
         #DLL Excludes
@@ -138,10 +130,9 @@ class BuildExe:
                 'icon_resources': [(0, self.icon_file)],
                 'copyright': self.copyright
             }],
-            # 'bundle_files': 1, 'optimize': 2, 'compressed': True, \
-            #options = {'py2exe': { 
-            #                      'excludes': self.exclude_modules, 'packages': self.extra_modules, \
-            #                      'dll_excludes': self.exclude_dll} },
+            options = {'py2exe': {'bundle_files': 1, 'optimize': 2, 'compressed': True,
+                                  'excludes': self.exclude_modules, 'packages': self.extra_modules,
+                                  'dll_excludes': self.exclude_dll} },
             zipfile = self.zipfile_name,
             data_files = extra_datas,
             )

@@ -528,11 +528,13 @@ class Blockade(Story):
                 dragon.waypoint = 200.0
 
 class Game:
+      gamename    = "Theory of Magicity"
+
       def __init__(self):
           # initialize pygame
           pygame.init()
           pygame.mixer.init()
-          pygame.display.set_caption('Magic')
+          pygame.display.set_caption(self.gamename)
           self.clock  = pygame.time.Clock()
 
           # screen params
@@ -580,9 +582,8 @@ class Game:
           self.set_music("happytheme")
 
           # text
-          gamename    = "Theory of Magicity"
-          title       = self.loader.biggoth.render(gamename, True, (192, 64, 32))
-          titleshadow = self.loader.biggoth.render(gamename, True, (48, 48, 48))
+          title       = self.loader.biggoth.render(self.gamename, True, (192, 64, 32))
+          titleshadow = self.loader.biggoth.render(self.gamename, True, (48, 48, 48))
 
           menu = [
                   { "id":  "tutorial", "txt": "Save the Rabbits" },
