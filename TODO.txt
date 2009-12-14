@@ -3,7 +3,6 @@ Stuff to do, in order:
   * creature sounds
    * should not be so lowsy
   * each field/ball has a sound effect
- * third level
  * visual effects
   * background images
 
@@ -12,6 +11,7 @@ Ideas:
   * merge/split - when low tension, forces not opposing
   * release/acquire - always
   * movement/shape - always
+   * not just the normal distribution
  * field effects
   * force vs speed?
    * speed - time multiplier

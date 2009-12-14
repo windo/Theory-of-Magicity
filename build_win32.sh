@@ -10,4 +10,4 @@ version=$(cat VERSION)
 mv dist/game.exe dist/magicity.exe
 mv dist magicity-$version
 zip -r magicity-win32-$version.zip magicity-$version
-#rm -rf magicity-$version
+rm -rf magicity-$version
