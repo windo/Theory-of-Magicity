@@ -55,7 +55,7 @@ class Story:
           self.game_over     = True
           self.game_result   = result
           if result:
-            self.game_over_img = self.world.loader.smallgoth.render("Game Won!", True, (0, 0, 64))
+            self.game_over_img = self.world.loader.smallgoth.render("You Win!", True, (0, 0, 64))
           else:
             self.game_over_img = self.world.loader.smallgoth.render("Game Over!", True, (0, 0, 64))
       
@@ -204,7 +204,7 @@ class Shepherd(Story):
 
           elif self.state == "particle_control":
             self.batch_narrate((
-              (0.0,  "A Magic Ball! it worked!"),
+              (0.0,  "A Magic Ball! It worked!"),
               (2.0,  "Of course - I have to be cautious now..."),
               (6.0,  "This is magic after all, it can be dangerous too."),
               (10.0, "If me or my rabbits are exposed to this field for too long, we may even die!", 10.0),
@@ -258,7 +258,7 @@ class Shepherd(Story):
             self.batch_narrate((
               (0.0,  "Wonderful, I can make the wind blow in both directions."),
               (4.0,  "This will be quite useful to guide those disobedient rabbits!"),
-              (10.0, "Now, I wonder how far have they wandered..."),
+              (10.0, "Now, I wonder how far they have wandered..."),
               (14.0, "I should go and find the last rabbit [left and right arrows]."),
               ))
 
@@ -278,8 +278,8 @@ class Shepherd(Story):
               (2.0, "That's the last one!"),
               (8.0, "So, if I can make an Energy Magic Ball [hold shift, press 'X']..."),
               (10.0, "I can change the speed and direction of the wind ['w' and 's' keys]..."),
-              (12.0, "And move it close to those rabbits ['a' and 'd' keys]..."),
-              (15.0, "I should have them gathered between the posts in no time at all!"),
+              (12.0, "And move it close to my rabbits ['a' and 'd' keys]..."),
+              (15.0, "I should have them gathered between the posts in no time!"),
               (20.0, "Of course, I must be careful not to hurt them."),
               ))
 
