@@ -369,6 +369,11 @@ class Sun(Actor):
       directed     = False
       initial_hp   = 0
       base_height  = 300
+class Post(Actor):
+      sprite_names = ["post"]
+      directed     = False
+      initial_hp   = 0
+      animate_stop = True
 
 class Dude(Actor):
       const_speed  = 6.0
@@ -465,7 +470,16 @@ class GuardianController(FSMController):
 
 class RabbitController(FSMController):
       states   = [ "idle", "flee" ]
-      waypoint = 25.0
+
+      def __init__(self, *args):
+          FSMController.__init__(self, *args)
+          self.waypoint = 0.0
+
+      def debug_info(self):
+          return "%s waypoint=%3f" % (FSMController.debug_info(self), self.waypoint)
+      def set_waypoint(self, waypoint):
+          self.waypoint = waypoint
+
       def state_change(self):
           if self.state == "idle":
             if self.last_hp * 0.99 > self.puppet.hp:
@@ -504,9 +518,12 @@ class DragonController(FSMController):
           FSMController.__init__(self, puppet)
           self.target   = False
           self.shot     = False
-          self.waypoint = 25.0
+          self.waypoint = 0.0
+
       def debug_info(self):
-          return "%s target=%s" % (FSMController.debug_info(self), self.target)
+          return "%s target=%s waypoint=%3f" % (FSMController.debug_info(self), self.target, self.waypoint)
+      def set_waypoint(self, waypoint):
+          self.waypoint = waypoint
 
       def nearby(self, dist, who):
           closest = dist

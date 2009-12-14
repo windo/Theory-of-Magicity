@@ -7,11 +7,13 @@ from operator import attrgetter
 import pygame
 from pygame.locals import *
 
-import actors, fields
+import actors, fields, stories
 
 class ResourceLoader:
       """
       Load images and divide them to separate surfaces
+      Load fonts
+      Load sounds
       """
       class NoImage(Exception):
             def __init__(self, name):
@@ -29,6 +31,29 @@ class ResourceLoader:
           self.smallgoth = pygame.font.Font("font/Deutsch.ttf", 56)
           self.textfont  = pygame.font.Font("font/angltrr.ttf", 20)
           self.debugfont = pygame.font.Font("font/freesansbold.ttf", 16)
+
+          # load sprites
+          self.sprite("fire", "fireball", 25, resize = (50, 50))
+          self.sprite("ice", "iceball", 25, resize = (50, 50))
+          self.sprite("ashes", "ashes", 100, resize = (50, 50))
+          
+          self.sprite("dude_svg", "dude-right", 100, resize = (50, 200))
+          self.sprite("dude_svg", "dude-left", 100, flip = True, resize = (50, 200))
+          self.sprite("rabbit_svg", "rabbit-right", 100, resize = (50, 50))
+          self.sprite("rabbit_svg", "rabbit-left", 100, flip = True, resize = (50, 50))
+          self.sprite("dragon_svg", "dragon-right", 100, resize = (50, 100))
+          self.sprite("dragon_svg", "dragon-left", 100, flip = True, resize = (50, 100))
+          self.sprite("guardian_svg", "guardian-right", 100, resize = (50, 200))
+          self.sprite("guardian_svg", "guardian-left", 100, flip = True, resize = (50, 200))
+
+          self.sprite("tree", "tree", resize = (600, 400))
+          self.sprite("sun", "sun", resize = (400, 400))
+          self.sprite("post", "post", 25)
+
+          # load sounds
+          self.sounds(["cry", "cape1", "cape2", "step"])
+          self.sounds(["beep1", "beep2", "jump"])
+          self.sounds(["moan1", "moan2", "crackle1", "crackle2"])
 
       def sprite(self, name, listname = False, width = False, start = 0, to = False, flip = False, resize = False):
           # load the file, if not already loaded
@@ -80,10 +105,10 @@ class ResourceLoader:
       def play_sound(self, name):
           self.soundlist[name].play()
 
-
 class View:
       """
       Viewport/scale to use for translating in-game coordinates to screen coordinates
+      and vice versa
       """
       def __init__(self, view, plane):
           """
@@ -118,6 +143,9 @@ class View:
           self.offset_x += x
           self.plane[0] += x
           self.plane[2] += x
+      def set_x(self, x):
+          diff = x - self.get_center_x()
+          self.move_x(diff)
 
       def sc2pl_x(self, x):
           return x * self.mult_x + self.offset_x
@@ -129,8 +157,13 @@ class View:
           return (self.offset_y - y) / self.mult_y
 
 class World:
+      """
+      A container for all level objects (actors, fields)
+      A time source
+      Also keeps ResourceLoader instance reference
+      """
       def __init__(self, loader, fieldtypes, view):
-          self.loader   = loader
+          self.loader      = loader
           self.view        = view
           self.time_offset = 0.0
           self.pause_start = False
@@ -208,328 +241,12 @@ class World:
       def all_fields(self):
           return self.fields.values()
 
-class Story:
-      def __init__(self, world):
-          self.world = world
-          # story state
-          self.state        = "begin"
-          self.game_over    = False
-          self.game_result  = None
-          self.state_time   = self.world.get_time()
-          self.story_time   = self.world.get_time()
-          # stories need narrations
-          self.narrations   = {}
-
-      def narrate(self, text, duration = 5.0, id = False):
-          if not id: id = text
-          if self.narrations.has_key(id):
-            return
-          # render and put to narration list
-          img = self.world.loader.textfont.render(text, True, (255, 255, 255))
-          self.narrations[id] = (self.world.get_time(), duration, img)
-
-      def set_state(self, state):
-          self.state = state
-          self.state_time = self.world.get_time()
-      def set_result(self, result):
-          self.game_over     = True
-          self.game_result   = result
-          if result:
-            self.game_over_img = self.world.loader.smallgoth.render("Game Won!", True, (0, 0, 64))
-          else:
-            self.game_over_img = self.world.loader.smallgoth.render("Game Over!", True, (0, 0, 64))
-      
-      def times(self):
-          now = self.world.get_time()
-          return now - self.story_time, now - self.state_time
-
-      # must overload this
-      def update(self):
-          pass
-
-      def draw(self, screen, draw_debug = False):
-          # draw game over
-          if self.game_over:
-            screen.blit(self.game_over_img,
-                        (self.world.view.sc_w() / 2 - self.game_over_img.get_width() / 2,
-                         self.world.view.sc_h() / 2 - self.game_over_img.get_height() / 2 - 100))
-
-          # proccess narratives
-          draw_list = []
-          for id in self.narrations.keys():
-            show_time, duration, img = self.narrations[id]
-            if show_time + duration < self.world.get_time():
-              del self.narrations[id]
-            else:
-              draw_list.append((int(show_time), img))
-          draw_list.sort(lambda x, y: x[0] - y[0])
-
-          # draw them
-          line_y = 10
-          for show_time, img in draw_list:
-            screen.blit(img, (10, line_y))
-            line_y += img.get_height() + 5
-
-class Tutorial(Story):
-      def __init__(self, *args):
-          Story.__init__(self, *args)
-
-          world = self.world
-          # paint some scenery
-          for i in xrange(10):
-            world.new_actor(actors.Tree, -250 + (500 / 10) * i + random() * 25)
-          for i in xrange(3):
-            world.new_actor(actors.Sun, -250 + (500 / 3) * i + random() * 25)
-
-          # enemies
-          world.new_actor(actors.ControlledDragon, 70)
-          world.new_actor(actors.ControlledDragon, 75)
-          world.new_actor(actors.ControlledDragon, 80)
-
-          # and sweet rabbits to protect
-          for i in xrange(50):
-            world.new_actor(actors.ControlledRabbit, -250 + 500 * random())
-
-          # player-controlled object
-          self.dude = world.new_actor(actors.Dude, 10)
-
-      def player(self):
-          return self.dude
-
-      def update(self):
-          story_time, state_time = self.times()
-
-          # ending conditions
-          if not self.game_over:
-            if self.dude.dead:
-              self.set_state("dudedeath")
-              self.set_result(False)
-            elif len(self.world.get_actors(include = [ actors.Rabbit ])) == 0:
-              self.set_state("rabbitdeath")
-              self.set_result(False)
-            elif len(self.world.get_actors(include = [ actors.Dragon ])) == 0:
-              self.set_state("dragondeath")
-              self.set_result(True)
-
-          # win!
-          if self.state == "dragondeath":
-            if state_time < 2.0:
-              self.narrate("Awesome job!")
-            elif state_time < 4.0:
-              self.narrate("You defeated all the dragons!")
-            elif state_time < 10.0:
-              self.narrate("I guess there is nothing else to do than to mingle with the rabbits now...")
-
-          # lose :(
-          elif self.state == "dudedeath":
-            if state_time < 2.0:
-              self.narrate("Ah...")
-            elif state_time < 4.0:
-              self.narrate("You were vanquished.")
-            elif state_time < 10.0:
-              self.narrate("You really should be more careful, who will protect the rabbits now?")
-
-          elif self.state == "rabbitdeath":
-            if state_time < 2.0:
-              self.narrate("Whoops!")
-            elif state_time < 4.0:
-              self.narrate("All the rabbits have been killed!")
-            elif state_time < 10.0:
-              self.narrate("What a cold and sad world it is now. Not blaming anyone, just stating the fact...")
-
-          # intro
-          elif self.state == "begin":
-            if state_time < 2.0:
-              pass
-            elif state_time < 5.0:
-              self.narrate("These rabbits are being slaughtered by the dragons...")
-            elif state_time < 6.0:
-              self.narrate("We must protect them.")
-              self.set_state("tutorial1")
-
-          # explain the controls
-          elif self.state == "tutorial1":
-            if state_time < 5.0:
-              pass
-            elif state_time < 8.0:
-              self.narrate("But first, let's get away from the dragons [use the arrow keys].")
-            elif state_time < 10.0:
-              self.narrate("The left direction seems safer [move left, away from the dragons].")
-            else:
-              if state_time % 15 < 1.0:
-                self.narrate("Please move further to the left so I can explain our world to you.")
-              if self.dude.pos < -25.0:
-                self.set_state("tutorial2")
-
-          elif self.state == "tutorial2":
-            if state_time < 2.0:
-              self.narrate("This is far enough, should be safe.")
-            if state_time < 6.0:
-              self.narrate("Those dragons you saw over there can be pretty dangerous.")
-            elif state_time < 8.0:
-              self.narrate("You saw them using Earth magic to kill the rabbits.")
-            elif state_time < 10.0:
-              self.narrate("The Earth magic will kill you, too.")
-            elif state_time < 14.0:
-              self.narrate("Unless you understand it, that is.")
-            elif state_time < 18.0:
-              self.narrate("Take a look at the Earth magic field [press 'c'].")
-            elif state_time < 20.0:
-              self.narrate("And cast an Earth magic ball [hold shift, press 'C'].")
-            else:
-              field_visible = self.world.get_field(fields.EarthField).visibility
-              ballcast      = False
-              for particle in self.dude.magic.affects.keys():
-                if isinstance(particle, fields.EarthBall):
-                  ballcast = True
-              if field_visible and ballcast:
-                self.set_state("tutorial3")
-              if state_time % 15 < 1.0:
-                if field_visible:
-                  self.narrate("Good, you can see the effects of you Earth magic balls on the field.")
-                else:
-                  self.narrate("Turn on Earth magic field view [press 'c'].", duration = 10.0)
-                if ballcast:
-                  self.narrate("Good, you have cast an Earth magic ball for practice. Nice.")
-                else:
-                  self.narrate("And also cast an Earth magic ball [hold shift, press 'C'].", duration = 10.0)
-
-          elif self.state == "tutorial3":
-            if state_time < 2.0:
-              self.narrate("Very good!")
-            elif state_time < 4.0:
-              self.narrate("You can see the Earth magic field and the way the Earth magic ball affects it.")
-            elif state_time < 10.0:
-              self.narrate("You can move the magic ball, too ['a' and 'd' keys].", duration = 10.0)
-            elif state_time < 15.0:
-              self.narrate("And you can set it's power ['w' and 's' keys].", duration = 10.0)
-            elif state_time < 20.0:
-              self.narrate("When you are done with a ball, you can release it ['r' key].", duration = 10.0)
-            else:
-              if state_time % 30 < 1.0:
-                self.narrate("Try to make an Earth magic ball [shift, press 'C'].", duration = 15.0)
-              elif state_time % 30 < 3.0:
-                self.narrate("Make it's power negative ['s' key].", duration = 15.0)
-              elif state_time % 30 < 5.0:
-                self.narrate("And move it close to yourself ['a' and 'd' keys].", duration = 15.0)
-              # check for the healing ball
-              for particle in self.dude.magic.affects.keys():
-                if isinstance(particle, fields.EarthBall):
-                  if self.dude.magic.affects[particle][1] < 0.0:
-                    if abs(particle.pos - self.dude.pos) < 1.0:
-                      print self.dude.magic.affects[particle]
-                      self.set_state("tutorial4")
-
-          elif self.state == "tutorial4":
-            if state_time < 2.0:
-              self.narrate("Well done!")
-            elif state_time < 6.0:
-              self.narrate("Negative Earth magic has a restoring effect on health.")
-            elif state_time < 10.0:
-              self.narrate("It's the opposite of the damaging magic balls the dragons were using.")
-            elif state_time < 14.0:
-              self.narrate("Two such opposite balls will even cancel each other out!")
-            elif state_time < 20.0:
-              self.narrate("There are two other types of magic: Light [press 'z'] and Energy [press 'x'].")
-            elif state_time < 24.0:
-              self.narrate("They operate in a similar way, but have rather different effects.")
-            elif state_time < 28.0:
-              self.narrate("You should try all three types of magic to get familiar with their use.")
-            elif state_time < 35.0:
-              self.narrate("When ready, move back toward the dragons.")
-            else:
-              if state_time % 30 < 2.0:
-                self.narrate("Try all three types of magic balls ['Z', 'X' and 'C' keys].", duration = 15.0)
-              elif state_time % 30 < 4.0:
-                self.narrate("Move closer to the dragons [right arrow] when you feel familiar with the magic.")
-              if self.dude.pos > -10.0:
-                self.set_state("tutorial5")
-
-          elif self.state == "tutorial5":
-            if state_time < 2.0:
-              self.narrate("A few last words of advice before you go and fight the dragons.")
-            elif state_time < 6.0:
-              self.narrate("Aside from making magic balls yourself, you can also capture them.")
-            elif state_time < 10.0:
-              self.narrate("For example those, that the dragons throw at you [ctrl, right arrow].", duration = 15.0)
-            elif state_time < 15.0:
-              self.narrate("But it works on all magic balls [ctrl, left/right arrow or a number].", duration = 15.0)
-            elif state_time < 25.0:
-              self.narrate("Now go, slay the dragons! Good luck!")
-              self.set_state("tutorial6")
-
-          elif self.state == "tutorial6":
-            if state_time % 30 > 29:
-              rabbits = len(self.world.get_actors(include = [ actors.Rabbit ]))
-              self.narrate("Fight the dragons! There are still %u rabbits left to save!" % (rabbits))
-
-class Blockade(Story):
-      def __init__(self, *args):
-          Story.__init__(self, *args)
-
-          world = self.world
-          # paint some scenery
-          for i in xrange(10):
-            world.new_actor(actors.Tree, -250 + (500 / 10) * i + random() * 25)
-          for i in xrange(3):
-            world.new_actor(actors.Sun, -250 + (500 / 3) * i + random() * 25)
-
-          # enemies
-          world.new_actor(actors.ControlledGuardian, 50)
-          world.new_actor(actors.ControlledGuardian, 100)
-
-          # player-controlled object
-          self.dude = world.new_actor(actors.Dude, 0)
-
-      def player(self):
-          return self.dude
-
-      def update(self):
-          story_time, state_time = self.times()
-          
-          if not self.game_over:
-            if self.dude.pos > 100.0:
-               self.set_state("passed")
-               self.set_result(True)
-            elif self.dude.dead:
-               self.set_state("dudedead")
-               self.set_result(False)
-
-          if self.state == "passed":
-             if state_time < 2.0:
-               self.narrate("Aha!")
-             elif state_time < 4.0:
-               self.narrate("The guardians can be passed after all!")
-             elif state_time < 8.0:
-               self.narrate("Well done, I can now continue the journey.")
-
-          elif self.state == "dudedead":
-             if state_time < 2.0:
-               self.narrate("Ah...")
-             elif state_time < 4.0:
-               self.narrate("Defeated by the dragons, what a sad fate.")
-
-          elif self.state == "begin":
-             if state_time < 2.0:
-               self.narrate("I've been fleeing hordes of dragons for several days now.")
-             elif state_time < 5.0:
-               self.narrate("But now these guardians seem to block my path.")
-             elif state_time < 10.0:
-               self.narrate("The guardians don't seem violent, but they do not seem to want to let me through.")
-             elif state_time < 14.0:
-               self.narrate("I must find a way through - otherways the dragons are going to get me.")
-               self.set_state("onslaught")
-
-          if self.state == "onslaught":
-            if state_time % 15.0 < 1.0:
-              dragons = len(self.world.get_actors(include = [actors.Dragon]))
-              for i in xrange(2 - dragons):
-                dragon = self.world.new_actor(actors.ControlledDragon, self.dude.pos - 75 + random() * 10)
-                dragon.waypoint = 200.0
-
 class Game:
+      """
+      Implements title screen, menu
+      Runs different levels (stories) - the main game loop
+      """
       gamename    = "Theory of Magicity"
-
       def __init__(self):
           # initialize pygame
           pygame.init()
@@ -544,28 +261,10 @@ class Game:
           #self.screen = pygame.display.set_mode(screensize)
           self.view   = View(screensize, (0, 0, 100, 2))
 
-          # loading sprites
-          self.loader = loader = ResourceLoader()
-          loader.sprite("fire", "fireball", 25, resize = (50, 50))
-          loader.sprite("ice", "iceball", 25, resize = (50, 50))
-          loader.sprite("ashes", "ashes", 100, resize = (50, 50))
-          
-          loader.sprite("dude_svg", "dude-right", 100, resize = (50, 200))
-          loader.sprite("dude_svg", "dude-left", 100, flip = True, resize = (50, 200))
-          loader.sprite("rabbit_svg", "rabbit-right", 100, resize = (50, 50))
-          loader.sprite("rabbit_svg", "rabbit-left", 100, flip = True, resize = (50, 50))
-          loader.sprite("dragon_svg", "dragon-right", 100, resize = (50, 100))
-          loader.sprite("dragon_svg", "dragon-left", 100, flip = True, resize = (50, 100))
-          loader.sprite("guardian_svg", "guardian-right", 100, resize = (50, 200))
-          loader.sprite("guardian_svg", "guardian-left", 100, flip = True, resize = (50, 200))
-
-          loader.sprite("tree", "tree", resize = (600, 400))
-          loader.sprite("sun", "sun", resize = (400, 400))
-          loader.sprite("title-bg", resize = screensize)
-
-          loader.sounds(["cry", "cape1", "cape2", "step"])
-          loader.sounds(["beep1", "beep2", "jump"])
-          loader.sounds(["moan1", "moan2", "crackle1", "crackle2"])
+          # loading resources
+          self.loader = ResourceLoader()
+          # for title screen
+          self.loader.sprite("title-bg", resize = screensize)
 
       def center_blit(self, img, x, y):
           self.screen.blit(img, (self.view.sc_w() / 2 - img.get_width() / 2 + x, y))
@@ -588,8 +287,9 @@ class Game:
           titleshadow = self.loader.biggoth.render(self.gamename, True, (48, 48, 48))
 
           menu = [
-                  { "id":  "tutorial", "txt": "Save the Rabbits" },
-                  { "id":  "blockade", "txt": "Face the Blockade" },
+                  { "id":  "shepherd", "txt": "Gentle Shepherd" },
+                  { "id":  "salvation", "txt": "Rabbits` Salvation" },
+                  { "id":  "blockade", "txt": "Guardian Blockade" },
                   { "id":  "exit", "txt": "Exit Game" },
                  ]
           for item in menu:
@@ -635,12 +335,15 @@ class Game:
                   print "Running level: %s" % (action)
                   if action == "exit":
                     forever = False
-                  elif action == "tutorial":
+                  elif action == "shepherd":
+                    self.set_music("happytheme")
+                    self.run_story(stories.Shepherd)
+                  elif action == "salvation":
                     self.set_music("warmarch2")
-                    self.run_story(Tutorial)
+                    self.run_story(stories.Salvation)
                   elif action == "blockade":
                     self.set_music("warmarch2")
-                    self.run_story(Blockade)
+                    self.run_story(stories.Blockade)
                   self.set_music("happytheme")
 
             # stay in menu

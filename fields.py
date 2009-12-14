@@ -118,7 +118,7 @@ class MagicParticle(actors.Actor):
           self.dead      = False
           self.field.add_particle(self)
 
-          # actors who are influencing this particle
+          # MagicCaster objects of actors who are influencing this particle
           self.affects = []
 
       def debug_info(self):
