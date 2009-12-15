@@ -1,5 +1,8 @@
 #!/bin/sh
 
+magicdir=$(dirname $0)/..
+cd $magicdir
+
 version=$(cat VERSION)
 d="magicity-$version"
 
