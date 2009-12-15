@@ -75,23 +75,32 @@ class Story:
                          self.world.view.sc_h() / 2 - self.game_over_img.get_height() / 2 - 100))
 
           # proccess narratives
-          draw_list = []
-          i = 0
+          draw_list    = []
+          extra_offset = 0
+          i            = 0
+          now = self.world.get_time()
           while i < len(self.narrations):
             narr = self.narrations[i]
-            if narr["showtime"] < self.world.get_time():
-              draw_list.append(narr["img"])
-              if narr["cleartime"] < self.world.get_time():
-                if narr["id"]:
-                  self.queue.pop(self.queue.index(narr["id"]))
-                self.narrations.pop(i)
+            showtime  = narr["showtime"]
+            cleartime = narr["cleartime"]
+            if showtime < now:
+              if cleartime < now:
+                if cleartime + 1.0 < now:
+                  if narr["id"]:
+                    self.queue.pop(self.queue.index(narr["id"]))
+                  self.narrations.pop(i)
+                else:
+                  part = (cleartime + 1.0 - now)
+                  extra_offset += int(part * (narr["img"].get_height() + 5))
+                  i += 1
               else:
+                draw_list.append(narr["img"])
                 i += 1
             else:
               i += 1
 
           # draw them
-          line_y = 10
+          line_y = 10 + extra_offset
           for img in draw_list:
             screen.blit(img, (10, line_y))
             line_y += img.get_height() + 5
