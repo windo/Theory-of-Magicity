@@ -173,7 +173,7 @@ class Nature(ParticleEffect):
           dot.ys += 5.0 * timediff
 
 class Wind(ParticleEffect):
-      normal_particles = 100
+      normal_particles = 50
       def gen_dot(self):
           x = random() * 10 - 5.0
           y = random() * 10
@@ -191,8 +191,8 @@ class Wind(ParticleEffect):
       def update_speed(self, dot, timediff):
           if self.intensity > 0: mult = -1
           else: mult = 1
-          dot.xs = mult * math.cos(dot.seed + dot.age * 12.0 * abs(self.intensity)) * 100.0
-          dot.ys = math.sin(dot.seed + dot.age * 12.0 * abs(self.intensity)) * 100.0
+          dot.xs = mult * math.cos(dot.seed + dot.age * 12.0 * abs(self.intensity)) * 100.0 * abs(self.intensity)
+          dot.ys = math.sin(dot.seed + dot.age * 12.0 * abs(self.intensity)) * 100.0 * abs(self.intensity)
 
 class Energy(ParticleEffect):
       def gen_dot(self):
@@ -200,18 +200,19 @@ class Energy(ParticleEffect):
           dot.xseed = random() * 100.0
           dot.yseed = random() * 100.0
           dot.xdiff = random() / 5.0
+          light = 32 * random()
           if self.intensity > 0:
-            dot.color = (255 - random() * 96, 32, 32, 32)
+            dot.color = (255 - random() * 96, 32 + light, 32 + light, 32)
           else:
-            dot.color = (32, 32, 255 - random() * 96, 32)
+            dot.color = (32 + light, 32 + light, 255 - random() * 96, 32)
           return dot
       def get_radius(self, dot):
-          return 5.0 + math.sin(12 * dot.age) * 5.0
+          return math.sin(6 * dot.age + dot.xseed) * 5.0 + 5.0
       def get_color(self, dot):
           return dot.color
       def update_speed(self, dot, timediff):
-          dot.xs = math.sin(6 * dot.age + dot.xseed * dot.xdiff) * 10.0
-          dot.ys = math.sin(6 * dot.age + dot.yseed) * 10.0
+          dot.xs = math.sin(6 * dot.age + dot.xseed * dot.xdiff) * 20.0
+          dot.ys = math.sin(6 * dot.age + dot.yseed) * 20.0
           
 
 if __name__ == "__main__":
@@ -220,7 +221,8 @@ if __name__ == "__main__":
   overlay = pygame.surface
   clock   = pygame.time.Clock()
   
-  forever = True
+  forever   = True
+  intensity = 1.0
   fx = []
   fx.append(Fire(xofs = 100))
   fx.append(Wind(xofs = 200))
@@ -233,6 +235,10 @@ if __name__ == "__main__":
       if event.type == pygame.KEYDOWN:
         if event.key == pygame.K_ESCAPE:
           forever = False
+        if event.key == pygame.K_UP:
+          intensity += 0.1
+        if event.key == pygame.K_DOWN:
+          intensity -= 0.1
   
     # draw
     screen.fill([32, 32, 96, 255])
@@ -242,4 +248,4 @@ if __name__ == "__main__":
   
     clock.tick(45)
     for p in fx:
-      p.update()
+      p.update(intensity)

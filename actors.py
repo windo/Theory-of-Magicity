@@ -108,6 +108,8 @@ class Actor:
       base_height  = 0.0
       directed     = True
       from_ceiling = False
+      stacking     = 0
+      # sounds
       snd_move     = []
       snd_death    = []
 
@@ -372,29 +374,32 @@ class FSMController:
           pass
 
 # scenery
-class Tree(Actor):
+class Scenery(Actor):
+      directed   = False
+      stacking   = 0
+      initial_hp = 0
+class Tree(Scenery):
       sprite_names = ["tree"]
-      directed     = False
-      initial_hp   = 0
-class Sun(Actor):
+class Sun(Scenery):
       sprite_names = ["sun"]
-      directed     = False
-      initial_hp   = 0
       base_height  = 300
-class Post(Actor):
+class Post(Scenery):
       sprite_names = ["post"]
-      directed     = False
-      initial_hp   = 0
       animate_stop = True
+      stacking     = 5
 
-class Dude(Actor):
+# Characters
+class Character(Actor):
+      stacking = 10
+
+class Dude(Character):
       const_speed  = 6.0
       initial_hp   = 100
       sprite_names = ["dude-left", "dude-right"]
       snd_move     = ["step", "cape1", "cape2"]
       snd_death    = ["cry"]
 
-class Rabbit(Actor):
+class Rabbit(Character):
       const_speed  = 9.0
       anim_speed   = 2.0
       initial_hp   = 15
@@ -403,19 +408,20 @@ class Rabbit(Actor):
       snd_move     = ["jump"]
       snd_death    = ["beep1", "beep2"]
 
-class Dragon(Actor):
+class Dragon(Character):
       const_speed  = 2.0
       sprite_names = ["dragon-left", "dragon-right"]
       snd_move     = ["crackle1", "crackle2"]
       snd_death    = ["moan1", "moan2"]
 
-class Guardian(Actor):
+class Guardian(Character):
       const_speed    = 0.5
       initial_hp     = 250
       regeneration   = 2.0
       initial_energy = 20.0
       sprite_names = ["guardian-left", "guardian-right"]
 
+# controllers
 class GuardianController(FSMController):
       states = [ "idle", "guarding" ]
       def __init__(self, puppet):

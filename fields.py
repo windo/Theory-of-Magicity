@@ -104,6 +104,7 @@ class MagicParticle(actors.Actor):
       hover_height = 100.0
       initial_hp   = 0
       directed     = False
+      stacking     = 20
 
       # Particle params
       base_dev     = 5.0

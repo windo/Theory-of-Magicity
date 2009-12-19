@@ -233,7 +233,7 @@ class World:
             ret.append(actor)
           return ret
       def sort_actors(self):
-          self.actors.sort(key = attrgetter("pos"))
+          self.actors.sort(lambda x, y: cmp(x.stacking, y.stacking) or cmp(y.pos, x.pos))
 
       # field management
       def get_field(self, fieldtype):
