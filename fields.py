@@ -129,7 +129,9 @@ class MagicParticle(actors.Actor):
             self.particle_effects = [fxpos, fxneg]
 
           # MagicCaster objects of actors who are influencing this particle
-          self.affects = []
+          self.affects  = []
+          # selected in game UI
+          self.selected = False
 
       def debug_info(self):
           desc  = actors.Actor.debug_info(self)
@@ -139,11 +141,6 @@ class MagicParticle(actors.Actor):
             acc, mult = aff.affect_particle(self)
             desc += "%s: acc=%.2f, mult=%.2f\n" % (name, acc, mult)
           return desc
-
-      def draw_selection(self, screen):
-          pygame.draw.circle(screen, self.field.poscolor,
-                             (self.world.view.pl2sc_x(self.pos), self.world.view.sc_h() - 40),
-                             25, 1)
 
       # MagicCasters register to influence the particle
       def affect(self, caster):
@@ -202,6 +199,17 @@ class MagicParticle(actors.Actor):
 
       def draw(self, screen, draw_debug = False, draw_hp = False):
           actors.Actor.draw(self, screen, draw_debug, draw_hp)
+          # draw magic "ball"
+          radius = 25
+          s = pygame.surface.Surface((radius * 2, radius * 2), pygame.SRCALPHA, 32)
+          pygame.draw.circle(s, (255, 255, 255, 32), (radius, radius), radius, 0)
+          screen.blit(s, (self.world.view.pl2sc_x(self.pos) - radius, self.world.view.sc_h() - self.hover_height - radius))
+          if self.selected:
+            radius = 50
+            s = pygame.surface.Surface((radius * 2, radius * 2), pygame.SRCALPHA, 32)
+            pygame.draw.circle(s, (255, 255, 255, 16), (radius, radius), radius, 0)
+            screen.blit(s, (self.world.view.pl2sc_x(self.pos) - radius, self.world.view.sc_h() - self.hover_height - radius))
+          # draw field effects
           for fx in self.particle_effects:
             fx.draw(screen, draw_debug)
 

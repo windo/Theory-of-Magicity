@@ -445,9 +445,6 @@ class Game:
                 screen.blit(ball_txt, (10, 40 + i * 20))
                 screen.blit(ball_nr, (view.pl2sc_x(ball.pos), view.sc_h() - 80))
                 i += 1
-            # draw player's magic (magic selection)
-            if sel_magic:
-              sel_magic.draw_selection(screen)
             # draw storyline elements
             story.draw(screen, draw_debug = draw_debug)
             # drawing done!
@@ -481,42 +478,33 @@ class Game:
                   free_camera = True
                   view.move_x(+10.0)
           
-                # magic moving
-                elif sel_magic and event.key == pygame.K_a:
-                  player.magic.move(sel_magic, -3.0)
-                elif sel_magic and event.key == pygame.K_d:
-                  player.magic.move(sel_magic, 3.0)
-                elif sel_magic and event.key == pygame.K_w:
-                  player.magic.power(sel_magic, diff = 3.0)
-                elif sel_magic and event.key == pygame.K_s:
-                  player.magic.power(sel_magic, diff = -3.0)
-                elif sel_magic and event.key == pygame.K_r:
-                  player.magic.release(sel_magic)
-                  sel_magic = False
-                elif event.key == pygame.K_r:
-                  player.magic.release_all()
-                  sel_magic = False
-
                 # mode switching
                 elif event.key == pygame.K_TAB:
                   #draw_hp    = not draw_hp
                   draw_debug = not draw_debug
                 elif event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
                   cast_magic = True
-                  sel_magic  = False
+                  if sel_magic:
+                    sel_magic.selected = False
+                    sel_magic  = False
                 elif event.key == pygame.K_LCTRL or event.key == pygame.K_RCTRL:
                   get_magic  = True
-                  sel_magic  = False
+                  if sel_magic:
+                    sel_magic.selected = False
+                    sel_magic  = False
                 
                 # cast_magic & fields
                 elif cast_magic and event.key == pygame.K_z:
                   sel_magic = player.magic.new(fields.LightBall)
+                  sel_magic.selected = True
                   casting = False
                 elif cast_magic and event.key == pygame.K_x:
                   sel_magic = player.magic.new(fields.EnergyBall)
+                  sel_magic.selected = True
                   casting = False
                 elif cast_magic and event.key == pygame.K_c:
                   sel_magic = player.magic.new(fields.EarthBall)
+                  sel_magic.selected = True
                   casting = False
 
                 # toggle magic fields
@@ -531,25 +519,52 @@ class Game:
                 elif get_magic and event.key >= pygame.K_1 and event.key <= pygame.K_9:
                   idx = event.key - pygame.K_1
                   if len(local_balls) > idx:
+                    if sel_magic:
+                      sel_magic.selected = False
                     sel_magic = local_balls[idx]
+                    sel_magic.selected = True
                     player.magic.capture(sel_magic)
-                elif get_magic and not cast_magic and event.key == pygame.K_a:
-                  capture_ball = False
+                elif get_magic and not cast_magic and (event.key == pygame.K_a or event.key == pygame.K_d):
+                  # select ball with arrow keys
+                  if sel_magic:
+                    refpos = sel_magic.pos
+                  else:
+                    refpos = player.pos
+                  # look for ball in right direction
+                  captured_ball = False
                   for ball in local_balls:
-                    if ball.pos < player.pos:
-                      capture_ball = ball
-                  if capture_ball:
-                    sel_magic = capture_ball
+                    if event.key == pygame.K_a:
+                      if ball.pos < refpos:
+                        captured_ball = ball
+                    elif event.key == pygame.K_d:
+                      if ball.pos > refpos:
+                        captured_ball = ball
+                        break
+                  if captured_ball:
+                    if sel_magic:
+                      sel_magic.selected = False
+                    sel_magic = captured_ball
+                    sel_magic.selected = True
                     player.magic.capture(sel_magic)
-                elif get_magic and not cast_magic and event.key == pygame.K_d:
-                  capture_ball = False
-                  for ball in local_balls:
-                    if ball.pos > player.pos:
-                      capture_ball = ball
-                      break
-                  if capture_ball:
-                    sel_magic = capture_ball
-                    player.magic.capture(sel_magic)
+
+                # magic moving
+                elif sel_magic and event.key == pygame.K_a:
+                  player.magic.move(sel_magic, -3.0)
+                elif sel_magic and event.key == pygame.K_d:
+                  player.magic.move(sel_magic, 3.0)
+                elif sel_magic and event.key == pygame.K_w:
+                  player.magic.power(sel_magic, diff = 3.0)
+                elif sel_magic and event.key == pygame.K_s:
+                  player.magic.power(sel_magic, diff = -3.0)
+                elif sel_magic and event.key == pygame.K_r:
+                  player.magic.release(sel_magic)
+                  sel_magic.selected = False
+                  sel_magic = False
+                elif event.key == pygame.K_r:
+                  player.magic.release_all()
+                  sel_magic.selected = False
+                  sel_magic = False
+
           
               # key releases
               if event.type == pygame.KEYUP:

@@ -11,6 +11,7 @@ class Dot:
           self.ys  = ys
           self.age = age
 class ParticleEffect:
+      normal_particles = 50.0
       def __init__(self, magic = None, intensity = 1.0, max_age = 2.0, xofs = 100.0):
           # how many to generate per second
           self.intensity = intensity
@@ -27,7 +28,7 @@ class ParticleEffect:
           # override one passed at init
           if intensity is not None:
             self.intensity = intensity
-          self.persec    = abs(self.intensity) * 50.0
+          self.persec    = abs(self.intensity) * self.normal_particles
           # timing
           new_time = time.time()
           timediff = new_time - self.last_time
@@ -38,9 +39,9 @@ class ParticleEffect:
           while i < len(self.dots):
             dot = self.dots[i]
             dot.age += timediff
+            self.update_speed(dot, timediff)
             dot.x   += dot.xs * timediff
             dot.y   += dot.ys * timediff
-            self.update_speed(dot, timediff)
             # age old dots
             if dot.age > self.max_age:
               self.dots.pop(i)
@@ -148,7 +149,8 @@ class Nature(ParticleEffect):
             ))
           self.naturegradient2 = Gradient((
             (   0,  64, 224,   0, 128),
-            (0.25,  64, 224,   0, 128),
+            (0.25, 128, 224,   0, 128),
+            (   1, 128,  64,   0, 128),
             (   2,  64,  32,   0,  64),
             ))
       def gen_dot(self):
@@ -167,21 +169,16 @@ class Nature(ParticleEffect):
           else:
             return self.naturegradient2.get_color(dot.age)
       def update_speed(self, dot, timediff):
-          dot.xs = math.sin(dot.seed + dot.age * 6) * 10.0 + math.sin(dot.seed + dot.age * 2) * 25.0
+          dot.xs = math.sin(dot.seed + dot.age * 6) * 10.0 + math.sin(dot.seed + dot.age * 4) * 15.0
           dot.ys += 5.0 * timediff
 
 class Wind(ParticleEffect):
+      normal_particles = 100
       def gen_dot(self):
-          x = random() * 10 - 10
+          x = random() * 10 - 5.0
           y = random() * 10
-          xs = abs(self.intensity) * 10.0 + random() * 5
-          ys = 80.0 + random() * 5
-          if self.intensity < 0:
-            x += 10
-            xs *= -1
-          dot = Dot(x, y, xs, ys)
-          dot.xseed = random() * 100.0
-          dot.yseed = random() * 100.0
+          dot = Dot(x, y, 0, 0)
+          dot.seed = random() * 100.0
           if random() < 0.8:
             dot.radius = 1
           else:
@@ -192,24 +189,24 @@ class Wind(ParticleEffect):
       def get_color(self, dot):
           return (0, 0, 0, 64)
       def update_speed(self, dot, timediff):
-          dot.ys -= 80.0 * timediff + math.sin(dot.age * 6.0 + dot.yseed) * 5.0
-          if self.intensity > 0: mult = 1
-          else: mult = -1
-          dot.xs += mult * 20.0 * timediff + math.sin(dot.age * 12.0 + dot.xseed) * 5.0
+          if self.intensity > 0: mult = -1
+          else: mult = 1
+          dot.xs = mult * math.cos(dot.seed + dot.age * 12.0 * abs(self.intensity)) * 100.0
+          dot.ys = math.sin(dot.seed + dot.age * 12.0 * abs(self.intensity)) * 100.0
 
 class Energy(ParticleEffect):
       def gen_dot(self):
-          dot = Dot(random() * 25.0 - 12.5, random() * 25.0 - 12.5, 0, 0)
+          dot = Dot(random() * 10.0 - 5.0, random() * 10.0 - 5.0, 0, 0)
           dot.xseed = random() * 100.0
           dot.yseed = random() * 100.0
           dot.xdiff = random() / 5.0
           if self.intensity > 0:
-            dot.color = (255 - random() * 96, 32, 32, 64)
+            dot.color = (255 - random() * 96, 32, 32, 32)
           else:
-            dot.color = (32, 32, 255 - random() * 96, 64)
+            dot.color = (32, 32, 255 - random() * 96, 32)
           return dot
       def get_radius(self, dot):
-          return 10.0 + math.sin(12 * dot.age) * 5.0
+          return 5.0 + math.sin(12 * dot.age) * 5.0
       def get_color(self, dot):
           return dot.color
       def update_speed(self, dot, timediff):

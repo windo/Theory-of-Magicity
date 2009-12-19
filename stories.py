@@ -504,7 +504,13 @@ class Blockade(Story):
           story_time, state_time = self.times()
           
           if not self.game_over:
-            if self.dude.pos > 100.0:
+            # see if we are past both the guardians
+            past = True
+            guardians = self.world.get_actors(include = [ actors.Guardian ])
+            for guard in guardians:
+              if guard.pos > self.dude.pos - 25.0:
+                past = False
+            if past:
                self.set_state("passed")
                self.set_result(True)
             elif self.dude.dead:

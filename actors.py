@@ -109,6 +109,7 @@ class Actor:
       directed     = True
       from_ceiling = False
       snd_move     = []
+      snd_death    = []
 
       # char attributes
       initial_hp     = 100.0
@@ -230,7 +231,7 @@ class Actor:
           # update movement
           if self.const_speed or self.const_accel:
             self.speed += self.timediff * self.accel
-            magic_speed = self.EnergyField.value(self.pos) * 10.0
+            magic_speed = self.EnergyField.value(self.pos) * 15.0
             magic_mult  = self.LightField.value(self.pos)
             if magic_mult > 0:
               magic_mult *= 5.0
