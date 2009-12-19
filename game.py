@@ -426,7 +426,7 @@ class Game:
             stime = time.time()
             world.sort_actors()
             for actor in world.all_actors():
-              actor.draw(view, screen, draw_hp, int(draw_debug) * debug_offset)
+              actor.draw(screen, int(draw_debug) * debug_offset, draw_hp)
               debug_offset = (debug_offset + 20) % (view.sc_h() - 20 - 100)
             draw_actor_time = time.time() - stime
             # draw performance stats

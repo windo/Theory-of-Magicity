@@ -148,18 +148,22 @@ class Actor:
           self.dead         = False
 
           # load images
-          if self.directed:
-            self.img_left  = world.loader.get_spritelist(self.sprite_names[0])
-            self.img_right = world.loader.get_spritelist(self.sprite_names[1])
-            self.img_count = len(self.img_left)
-            self.img_w     = self.img_left[0].get_width()
-            self.img_h     = self.img_left[0].get_height()
+          if len(self.sprite_names):
+            if self.directed:
+              self.img_left  = world.loader.get_spritelist(self.sprite_names[0])
+              self.img_right = world.loader.get_spritelist(self.sprite_names[1])
+              self.img_count = len(self.img_left)
+              self.img_w     = self.img_left[0].get_width()
+              self.img_h     = self.img_left[0].get_height()
+            else:
+              self.img_list  = world.loader.get_spritelist(self.sprite_names[0])
+              self.img_count = len(self.img_list)
+              self.img_w     = self.img_list[0].get_width()
+              self.img_h     = self.img_list[0].get_height()
+            self.cur_img_idx = 0
           else:
-            self.img_list  = world.loader.get_spritelist(self.sprite_names[0])
-            self.img_count = len(self.img_list)
-            self.img_w     = self.img_list[0].get_width()
-            self.img_h     = self.img_list[0].get_height()
-          self.cur_img_idx = 0
+            self.img_w = 100
+            self.img_h = 100
 
           # controller init
           if self.control:
@@ -259,10 +263,27 @@ class Actor:
             self.controller.update()
       
       # draw image, either left-right directed or unidirectional
-      def draw(self, view, screen, draw_hp = False, draw_debug = False):
+      def draw(self, screen, draw_debug = False, draw_hp = False):
+          view = self.world.view
           # do not draw off-the screen actors
-          if self.pos + self.img_w < self.world.view.pl_x1() or self.pos - self.img_w > self.world.view.pl_x2():
+          if self.pos + self.img_w < view.pl_x1() or self.pos - self.img_w > view.pl_x2():
             return
+
+          # draw debugging information
+          if draw_debug:
+            lines = self.debug_info().split("\n")
+            txts  = []
+            for line in lines:
+              txts.append(self.world.loader.debugfont.render(line, True, (255, 255, 255)))
+            i = 0
+            for txt in txts:
+              screen.blit(txt, (view.pl2sc_x(self.pos) - self.img_w / 2, int(draw_debug) + 20 + i * 20))
+              i += 1
+
+          # do not draw/animate spriteless actors
+          if len(self.sprite_names) == 0:
+            return
+
           # facing direction
           if self.directed:
             if self.direction > 0:
@@ -291,23 +312,13 @@ class Actor:
           coords = (view.pl2sc_x(self.pos) - self.img_w / 2, view.sc_h() - self.img_h - hover - self.base_height)
           screen.blit(img, coords)
 
-          # draw hp bar
+          # draw hp bar (if there is one)
           if draw_hp and self.initial_hp:
             hp_color   = (64, 255, 64)
             hp_border  = (view.pl2sc_x(self.pos), view.sc_h() - self.img_h - hover, 30, 3)
             hp_fill    = (view.pl2sc_x(self.pos), view.sc_h() - self.img_h - hover, 30 * (self.hp / self.initial_hp), 3)
             pygame.draw.rect(screen, hp_color, hp_border, 1)
             pygame.draw.rect(screen, hp_color, hp_fill, 0)
-
-          if draw_debug:
-            lines = self.debug_info().split("\n")
-            txts  = []
-            for line in lines:
-              txts.append(self.world.loader.debugfont.render(line, True, (255, 255, 255)))
-            i = 0
-            for txt in txts:
-              screen.blit(txt, (view.pl2sc_x(self.pos) - img.get_width() / 2, int(draw_debug) + 20 + i * 20))
-              i += 1
 
 import fields
 

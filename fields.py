@@ -1,5 +1,6 @@
 from random import random
 import pygame, math
+import effects
 
 class MagicField:
       """
@@ -100,7 +101,7 @@ class MagicParticle(actors.Actor):
       const_accel  = 5.0
       animate_stop = True
       anim_speed   = 3.0
-      hover_height = 50.0
+      hover_height = 100.0
       initial_hp   = 0
       directed     = False
 
@@ -117,6 +118,15 @@ class MagicParticle(actors.Actor):
           self.deadtimer = False
           self.dead      = False
           self.field.add_particle(self)
+
+          # animation
+          if len(self.effectors) == 1:
+            fx = self.effectors[0](self)
+            self.particle_effects = [fx]
+          else:
+            fxpos = self.effectors[0](self)
+            fxneg = self.effectors[1](self)
+            self.particle_effects = [fxpos, fxneg]
 
           # MagicCaster objects of actors who are influencing this particle
           self.affects = []
@@ -156,6 +166,18 @@ class MagicParticle(actors.Actor):
 
       def update(self):
           actors.Actor.update(self)
+
+          # update fancy graphics drawers
+          value = self.field.value(self.pos)
+          if len(self.particle_effects) == 1:
+            self.particle_effects[0].update(value)
+          else:
+            if value > 0:
+              self.particle_effects[0].update(value)
+              self.particle_effects[1].update(0)
+            else:
+              self.particle_effects[0].update(0)
+              self.particle_effects[1].update(abs(value))
          
           # each caster can effect the particle
           accel = 0.0
@@ -178,13 +200,21 @@ class MagicParticle(actors.Actor):
           else:
             self.deadtimer = False
 
+      def draw(self, screen, draw_debug = False, draw_hp = False):
+          actors.Actor.draw(self, screen, draw_debug, draw_hp)
+          for fx in self.particle_effects:
+            fx.draw(screen, draw_debug)
+
 
 class LightBall(MagicParticle):
-      sprite_names = ["iceball"]
+      sprite_names = []
+      effectors    = [ effects.Energy ]
       fieldtype    = LightField
 class EnergyBall(MagicParticle):
-      sprite_names = ["ashes"]
+      sprite_names = []
+      effectors    = [ effects.Wind ]
       fieldtype    = EnergyField
 class EarthBall(MagicParticle):
-      sprite_names = ["fireball"]
+      sprite_names = []
+      effectors    = [ effects.Fire, effects.Nature ]
       fieldtype    = EarthField

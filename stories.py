@@ -377,7 +377,6 @@ class Salvation(Story):
               (5.0, "I have to protect them!"),
               (8.0, "But first, I must get away from the dragons [left and right arrow]."),
               ))
-            self.set_state("capture_ball")
             if state_time > 10.0 and state_time % 15 < 1.0:
               self.narrate("Move left, away from the dragons [left arrow].", duration = 10.0, id = "move")
             if self.dude.pos < -25.0:
