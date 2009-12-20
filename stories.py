@@ -16,11 +16,11 @@ class Story:
           self.queue       = []
 
       def narrate(self, text, showtime = 0.0, duration = 5.0, id = False):
-          if id:
-            if id in self.queue:
-              return
-            else:
-              self.queue.append(id)
+          if not id: id = text
+          if id in self.queue:
+            return
+          else:
+            self.queue.append(id)
           now = self.world.get_time()
           # render
           img = self.world.loader.textfont.render(text, True, (255, 255, 255))
@@ -36,7 +36,9 @@ class Story:
           proccess a tuple of tuples containing narrations
           """
           if not id in self.queue:
+            index = 0
             for narr in narrations:
+              index += 1
               narr = (narr[1], narr[0]) + narr[2:]
               self.narrate(*narr)
             self.queue.append(id)
@@ -110,6 +112,7 @@ class Shepherd(Story):
           Story.__init__(self, *args)
 
           world = self.world
+          world.add_background("hills")
           # paint some scenery
           for i in xrange(10):
             world.new_actor(actors.Tree, -250 + (500 / 10) * i + random() * 25)
@@ -129,10 +132,10 @@ class Shepherd(Story):
           world.new_actor(actors.Post, 100)
 
           # add some rabbits to guide
-          self.totalrabbits = 15
+          self.totalrabbits = 25
           for i in xrange(self.totalrabbits):
             rabbit = world.new_actor(actors.ControlledRabbit, -25.0 + 50 * random())
-            rabbit.controller.set_waypoint(10.0)
+            rabbit.controller.set_waypoint(0.0)
 
           # player-controlled object
           self.dude = world.new_actor(actors.Dude, 75.0)
@@ -215,9 +218,9 @@ class Shepherd(Story):
 
             if state_time > 20 and state_time % 15.0 < 1:
               if not field_visible:
-                self.narrate("I need to see the Energy Magic Field [press 'x'].", duration = 10.0, id = "field")
+                self.narrate("I need to see the Energy Magic Field [press 'x'].", duration = 10.0)
               if not ballcast:
-                self.narrate("I need to cast an Energy Magic Ball [hold shift, press 'X'].", duration = 10.0, id = "ball")
+                self.narrate("I need to cast an Energy Magic Ball [hold shift, press 'X'].", duration = 10.0)
 
           elif self.state == "particle_control":
             self.batch_narrate((
@@ -238,7 +241,7 @@ class Shepherd(Story):
                   break
 
             if state_time > 30 and state_time % 15.0 < 1:
-              self.narrate("I need to get this ball closer to myself ['a' and 'd' keys].", duration = 10.0, id = "closer")
+              self.narrate("I need to get this ball closer to myself ['a' and 'd' keys].", duration = 10.0)
 
           elif self.state == "particle_power":
             self.batch_narrate((
@@ -265,11 +268,11 @@ class Shepherd(Story):
             
             if state_time > 20.0 and state_time % 15 < 1.0:
               if not ballcast:
-                self.narrate("I need to have an Energy Magic Ball [hold shift, press 'X'].", duration = 10.0, id = "ball")
+                self.narrate("I need to have an Energy Magic Ball [hold shift, press 'X'].", duration = 10.0)
               if not negative:
-                self.narrate("The Energy Magic Ball needs to have a negative energy ['s' key].", duration = 10.0, id = "energy")
+                self.narrate("The Energy Magic Ball needs to have a negative energy ['s' key].", duration = 10.0)
               if not close:
-                self.narrate("The Energy Magic Ball needs to be close to me ['a' and 'd' keys].", duration = 10.0, id = "close")
+                self.narrate("The Energy Magic Ball needs to be close to me ['a' and 'd' keys].", duration = 10.0)
 
           elif self.state == "find_rabbits":
             self.batch_narrate((
@@ -287,11 +290,11 @@ class Shepherd(Story):
               self.set_state("gather_rabbits")
 
             if state_time > 20.0 and state_time % 15.0 < 1.0:
-              self.narrate("I should move left [left arrow] to find the last rabbit.", duration = 10.0, id = "move")
+              self.narrate("I should move left [left arrow] to find the last rabbit.", duration = 10.0)
 
           elif self.state == "gather_rabbits":
             self.batch_narrate((
-              (0.0, "...13, 14, 15!"),
+              (0.0, "...23, 24, 25!"),
               (2.0, "That's the last one!"),
               (8.0, "So, if I can make an Energy Magic Ball [hold shift, press 'X']..."),
               (10.0, "I can change the speed and direction of the wind ['w' and 's' keys]..."),
@@ -301,16 +304,17 @@ class Shepherd(Story):
               ))
 
             if state_time > 30.0 and state_time % 30.0 < 1.0:
-              self.narrate("I should use an Energy Magic Ball [hold shift, press 'X']...", duration = 10.0, id = "ball")
-              self.narrate("...change it's wind direction ['w' and 's' keys]...", duration = 10.0, id = "power")
-              self.narrate("...and move it close to rabbits ['a' and 'd' keys]...", duration = 10.0, id = "move")
-              self.narrate("...to guide them between the posts [to the right].", duration = 10.0, id = "yard")
+              self.narrate("I should use an Energy Magic Ball [hold shift, press 'X']...", duration = 10.0)
+              self.narrate("...change it's wind direction ['w' and 's' keys]...", duration = 10.0)
+              self.narrate("...and move it close to rabbits ['a' and 'd' keys]...", duration = 10.0)
+              self.narrate("...to guide them between the posts [to the right].", duration = 10.0)
 
 class Salvation(Story):
       def __init__(self, *args):
           Story.__init__(self, *args)
 
           world = self.world
+          world.add_background("hills")
           # paint some scenery
           for i in xrange(10):
             world.new_actor(actors.Tree, -250 + (500 / 10) * i + random() * 25)
@@ -337,7 +341,7 @@ class Salvation(Story):
             dragon.controller.set_waypoint(50.0)
 
           # sweet rabbits to protect
-          for i in xrange(50):
+          for i in xrange(25):
             rabbit = world.new_actor(actors.ControlledRabbit, -50.0 + 200 * random())
             rabbit.controller.set_waypoint(25.0)
 
@@ -394,7 +398,7 @@ class Salvation(Story):
               (8.0, "But first, I must get away from the dragons [left and right arrow]."),
               ))
             if state_time > 10.0 and state_time % 15 < 1.0:
-              self.narrate("Move left, away from the dragons [left arrow].", duration = 10.0, id = "move")
+              self.narrate("Move left, away from the dragons [left arrow].", duration = 10.0)
             if self.dude.pos < -25.0:
               self.set_state("earthmagic")
 
@@ -417,13 +421,13 @@ class Salvation(Story):
               self.set_state("particle_control")
             if state_time > 20.0 and state_time % 15 < 1.0:
               if field_visible:
-                self.narrate("Good, the effects of you Earth Magic Balls can be seen on the field.", id = "field")
+                self.narrate("Good, the effects of you Earth Magic Balls can be seen on the field.")
               else:
-                self.narrate("Take a look at the Earth Magic Field [press 'c'].", duration = 10.0, id = "field")
+                self.narrate("Take a look at the Earth Magic Field [press 'c'].", duration = 10.0)
               if ballcast:
-                self.narrate("Good, you have cast an Earth Magic Ball for practice.", id = "ball")
+                self.narrate("Good, you have cast an Earth Magic Ball for practice.")
               else:
-                self.narrate("And also cast an Earth Magic Ball [hold shift, press 'C'].", duration = 10.0, id = "ball")
+                self.narrate("And also cast an Earth Magic Ball [hold shift, press 'C'].", duration = 10.0)
 
           elif self.state == "particle_control":
             self.batch_narrate((
@@ -462,7 +466,7 @@ class Salvation(Story):
               ))
 
             if state_time > 20 and state_time % 15 < 1:
-              self.narrate("Move right, closer to the dragons [right arrow].", id = "approach")
+              self.narrate("Move right, closer to the dragons [right arrow].")
             
             close = False
             for dragon in self.world.get_actors(include = [actors.Dragon]):
@@ -500,6 +504,7 @@ class Blockade(Story):
           Story.__init__(self, *args)
 
           world = self.world
+          world.add_background("hills")
           # paint some scenery
           for i in xrange(10):
             world.new_actor(actors.Tree, -250 + (500 / 10) * i + random() * 25)

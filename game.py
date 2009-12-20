@@ -182,6 +182,7 @@ class World:
             field = fieldtype(loader)
             self.fields[fieldtype] = field
           self.actors  = []
+          self.backgrounds = []
 
       def get_time(self):
           if self.pause_start:
@@ -248,6 +249,21 @@ class World:
           return self.fields[fieldtype]
       def all_fields(self):
           return self.fields.values()
+
+      # backgrounds
+      def add_background(self, name, distance = 2.0):
+          img = self.loader.get_sprite(name)
+          self.backgrounds.append((img, distance))
+          self.backgrounds.sort(lambda x, y: cmp(y[1], x[1]))
+          
+      def draw_background(self, screen, draw_debug = False):
+          for bg, distance in self.backgrounds:
+            bg_w   = bg.get_width()
+            bg_h   = bg.get_height()
+            offset = (self.view.pl2sc_x(0) / distance) % bg_w - bg_w
+            count  = int(self.view.sc_w() / bg_w) + 2
+            for i in xrange(count):
+              screen.blit(bg, (offset + i * bg_w, self.view.sc_h() - bg_h))
 
 class Game:
       """
@@ -395,8 +411,6 @@ class Game:
           cast_magic = False
           sel_magic  = False
 
-          background = self.loader.get_sprite("hills")
-
           while forever:
             # actors moving
             stime = time.time()
@@ -428,10 +442,7 @@ class Game:
               screen.fill([day * 32, 32 + day * 32, 128 + day * 32])
 
             # background image
-            bg_w = background.get_width()
-            p    = (view.pl2sc_x(0) / 2) % bg_w - bg_w
-            for i in xrange(3):
-              screen.blit(background, (p + i * bg_w, view.sc_h() - background.get_height()))
+            world.draw_background(screen, draw_debug)
             
             # draw fields
             stime = time.time()

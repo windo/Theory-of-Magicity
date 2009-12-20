@@ -3,8 +3,6 @@ Stuff to do, in order:
   * creature sounds
    * should not be so lowsy
   * each field/ball has a sound effect
- * visual effects
-  * background images
 
 Ideas:
  * ball actions
