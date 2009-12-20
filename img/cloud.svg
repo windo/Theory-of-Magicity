@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="744.09448819"
+   height="1052.3622047"
+   id="svg2"
+   sodipodi:version="0.32"
+   inkscape:version="0.46"
+   sodipodi:docname="cloud.svg"
+   inkscape:output_extension="org.inkscape.output.svg.inkscape">
+  <defs
+     id="defs4">
+    <inkscape:perspective
+       sodipodi:type="inkscape:persp3d"
+       inkscape:vp_x="0 : 526.18109 : 1"
+       inkscape:vp_y="0 : 1000 : 0"
+       inkscape:vp_z="744.09448 : 526.18109 : 1"
+       inkscape:persp3d-origin="372.04724 : 350.78739 : 1"
+       id="perspective10" />
+    <filter
+       inkscape:collect="always"
+       id="filter3265"
+       x="-0.042375712"
+       width="1.0847514"
+       y="-0.10272309"
+       height="1.2054462">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="6.6215908"
+         id="feGaussianBlur3267" />
+    </filter>
+    <clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath3273">
+      <path
+         style="fill:#ffffff;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+         d="M 46.428571,1020.2193 C 76.623922,1025.5856 107.20164,1029.8048 139.28571,1029.505 C 173.01669,1029.7963 190.84172,1015.879 219.28571,1014.505 C 276.81861,1015.3468 284.03933,1030.7203 319.28571,1030.2193 C 342.83361,1030.7969 373.55132,1020.4805 371.42857,1018.0765 C 397.25095,992.10957 383.06601,947.76736 355,933.79075 C 319.28522,915.05969 300.8629,928.03146 287.85714,950.93361 C 288.12272,925.16666 291.472,897.3072 240,906.6479 C 232.36194,898.83224 193.88488,855.26868 175.71429,922.36218 C 146.65616,875.71714 135.89423,914.52549 130,933.07647 C 104.57462,893.11803 102.32258,906.31902 75.714286,919.50504 C 54.410255,909.15757 30.079413,884.10845 21.428571,935.21933 C 13.956128,987.26339 37.018651,1011.2594 46.428571,1020.2193 z"
+         id="path3275"
+         sodipodi:nodetypes="ccccccccccccc" />
+    </clipPath>
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     gridtolerance="10000"
+     guidetolerance="10"
+     objecttolerance="10"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="1.4"
+     inkscape:cx="-7.0561557"
+     inkscape:cy="176.99729"
+     inkscape:document-units="px"
+     inkscape:current-layer="layer1"
+     showgrid="false"
+     inkscape:window-width="1280"
+     inkscape:window-height="712"
+     inkscape:window-x="0"
+     inkscape:window-y="29" />
+  <metadata
+     id="metadata7">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       style="opacity:0.8;fill:#ffffff;fill-opacity:1;fill-rule:evenodd;stroke:#808080;stroke-width:10;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;filter:url(#filter3265)"
+       d="M 46.428592,1020.2189 C 76.623938,1025.5852 107.20166,1029.8044 139.28573,1029.5046 C 173.01671,1029.7959 190.84174,1015.8786 219.28573,1014.5046 C 276.81863,1015.3464 284.03935,1030.7199 319.28573,1030.2189 C 342.83363,1030.7965 373.55134,1020.4801 371.42859,1018.0761 C 397.25097,992.10907 383.06603,947.76686 355.00002,933.79025 C 319.28524,915.05919 300.86292,928.03096 287.85716,950.93311 C 288.12274,925.16616 291.47202,897.3067 240.00002,906.6474 C 232.36196,898.83174 193.8849,855.26818 175.71431,922.36168 C 146.65618,875.71664 135.89425,914.52499 130.00002,933.07597 C 104.57464,893.11753 102.3226,906.31852 75.714308,919.50454 C 54.410276,909.15707 30.079434,884.10795 21.428592,935.21883 C 13.956149,987.26289 37.018672,1011.259 46.428592,1020.2189 z"
+       id="path3179"
+       sodipodi:nodetypes="ccccccccccccc"
+       clip-path="url(#clipPath3273)" />
+  </g>
+</svg>

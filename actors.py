@@ -98,17 +98,21 @@ class MagicCaster:
 
 class Actor:
       # movement
-      const_speed    = 0.0
-      const_accel    = 0.0
+      const_speed = 0.0
+      const_accel = 0.0
+      feel_magic  = True
 
       # animation conf
       animate_stop = False
       anim_speed   = 1.0
+      directed     = True
+      stacking     = 0
+
+      # vertical
       hover_height = 0.0
       base_height  = 0.0
-      directed     = True
       from_ceiling = False
-      stacking     = 0
+
       # sounds
       snd_move     = []
       snd_death    = []
@@ -121,12 +125,19 @@ class Actor:
       # "puppetmaster"
       control        = None
 
+      # if draw_debug has any effect
+      in_dev_mode    = False
+
       def __init__(self, world, pos):
+          self.world  = world
           # movement params
-          self.speed = 0.0
-          self.accel = 0.0
-          self.pos   = pos
-          self.world = world
+          self.pos    = pos
+          self.speed  = 0.0
+          self.accel  = 0.0
+          # mostly unused
+          self.ypos   = 0.0
+          self.yspeed = 0.0
+          self.yaccel = 0.0
 
           # fields
           self.LightField = self.world.get_field(fields.LightField)
@@ -224,43 +235,58 @@ class Actor:
             self.accel   = 0
           self.animate   = self.animate_stop
 
-     # called every frame
+      # called every frame
       def update(self):
           # update actor clock
           now              = self.world.get_time()
           self.timediff    = now - self.last_update
           self.last_update = now
+
           # update movement
           if self.const_speed or self.const_accel:
-            self.speed += self.timediff * self.accel
-            magic_speed = self.EnergyField.value(self.pos) * 15.0
-            magic_mult  = self.LightField.value(self.pos)
-            if magic_mult > 0:
-              magic_mult *= 5.0
+            # normal movement
+            self.speed  += self.timediff * self.accel
+            self.yspeed += self.timediff * self.yaccel
+            # magical movement
+            if self.feel_magic:
+              magic_speed = self.EnergyField.value(self.pos) * 10.0
+              magic_mult  = self.LightField.value(self.pos)
+              if magic_mult > 0:
+                magic_mult *= 5.0
+              else:
+                magic_mult *= 1.0
+              magic_mult   += 1.0
             else:
-              magic_mult *= 1.0
-            magic_mult   += 1.0
+              magic_speed = 0.0
+              magic_mult  = 1.0
+            # update position
             self.pos   += magic_mult * self.timediff * (self.speed + magic_speed)
+            self.ypos  += magic_mult * self.timediff * self.yspeed
             if self.animate:
               self.movement_sound()
+
           # update hp
-          light_damage  = abs(self.LightField.value(self.pos))    * 10.0
-          energy_damage = abs(self.EnergyField.value(self.pos))   * 10.0
-          earth_damage  = max(self.EarthField.value(self.pos), 0) * 25.0
-          self.hp -= self.timediff * (light_damage + energy_damage + earth_damage)
-          if self.hp < self.initial_hp:
-            magic_regen = max(-self.EarthField.value(self.pos), 0) * 12.5
-            self.hp += self.timediff * (self.regeneration + magic_regen)
-          if self.hp > self.initial_hp:
-            self.hp = self.initial_hp
-          # death
-          if self.hp <= 0 and self.initial_hp:
-            self.dead = True
-            self.death_sound()
-            self.destroy()
+          if self.initial_hp:
+            light_damage  = abs(self.LightField.value(self.pos))    * 10.0
+            energy_damage = abs(self.EnergyField.value(self.pos))   * 10.0
+            earth_damage  = max(self.EarthField.value(self.pos), 0) * 25.0
+            self.hp -= self.timediff * (light_damage + energy_damage + earth_damage)
+            if self.hp < self.initial_hp:
+              magic_regen = max(-self.EarthField.value(self.pos), 0) * 12.5
+              self.hp += self.timediff * (self.regeneration + magic_regen)
+            if self.hp > self.initial_hp:
+              self.hp = self.initial_hp
+            # death
+            if self.hp <= 0 and self.initial_hp:
+              self.dead = True
+              self.death_sound()
+              self.destroy()
+
           # set magic energy
-          magic_mult = self.EarthField.value(self.pos) / 2.0 + 1.0
-          self.magic_energy = magic_mult * self.initial_energy
+          if self.initial_energy:
+            magic_mult = self.EarthField.value(self.pos) / 2.0 + 1.0
+            self.magic_energy = magic_mult * self.initial_energy
+          
           # controlled actors
           if self.controller:
             self.controller.update()
@@ -273,7 +299,7 @@ class Actor:
             return
 
           # draw debugging information
-          if draw_debug:
+          if draw_debug and self.in_dev_mode:
             lines = self.debug_info().split("\n")
             txts  = []
             for line in lines:
@@ -303,7 +329,7 @@ class Actor:
           else:
             self.cur_img_idx = 0
 
-          # hovering in air (particles)
+          # hovering in air (slightly wobbling up and down)
           if self.hover_height:
             hover = self.hover_height + self.hover_height * \
                     math.sin((time.time() + self.rnd_time_offset - self.start_time) * 2) * 0.3
@@ -312,8 +338,11 @@ class Actor:
 
           # actual drawing
           img = imglist[self.cur_img_idx]
-          coords = (view.pl2sc_x(self.pos) - self.img_w / 2, view.sc_h() - self.img_h - hover - self.base_height)
-          screen.blit(img, coords)
+          x   = view.pl2sc_x(self.pos)  - self.img_w / 2
+          y   = view.pl2sc_y(self.ypos) + hover + self.base_height
+          if not self.from_ceiling:
+            y = view.sc_h() - self.img_h - y
+          screen.blit(img, (x, y))
 
           # draw hp bar (if there is one)
           if draw_hp and self.initial_hp:
@@ -325,72 +354,63 @@ class Actor:
 
 import fields
 
-class FSMController:
-      states = [ "idle" ]
-      start_state = "idle"
-
-      class InvalidState(Exception):
-            def __init__(self, state):
-                self.state = state
-            def __str__(self):
-                return "Invalid state change to: %s" % (self.state)
-
-      def __init__(self, puppet):
-          self.puppet  = puppet
-          self.last_hp = puppet.hp
-          self.state   = False
-          self.set_state(self.start_state)
-      def __str__(self):
-          return "%s" % (str(self.__class__).split(".")[1])
-      def debug_info(self):
-          return "%s: [%s]" % (str(self), self.state)
-
-      def set_state(self, newstate):
-          if not newstate in self.states:
-            raise self.InvalidState(newstate)
-          if newstate != self.state:
-            self.state       = newstate
-            self.state_start = self.puppet.world.get_time()
-            self.action_time = 0.0
-
-      def time_passed(self, duration, rand = 0.0):
-          passed = self.puppet.world.get_time() - self.action_time
-          if passed > duration + rand * random():
-            self.action_time = self.puppet.world.get_time()
-            return True
-          else:
-            return False
-
-      def state_time(self):
-          return self.puppet.world.get_time() - self.state_start
-
-      def update(self):
-          self.state_change()
-          self.last_hp = self.puppet.hp
-          self.state_action()
-      def state_change(self):
-          pass
-      def state_action(self):
-          pass
+## stacking rules:
+# static sky background   - 0-4
+# moving sky background   - 5-9
+# on-ground background    - 10-14
+# on-ground level objects - 15-19
+# NPCs                    - 20-24
+# player                  - 25
+# magicparticles          - 26+
 
 # scenery
 class Scenery(Actor):
-      directed   = False
-      stacking   = 0
-      initial_hp = 0
+      feel_magic     = False
+      initial_hp     = 0
+      initial_energy = 0
+      directed       = False
 class Tree(Scenery):
       sprite_names = ["tree"]
+      stacking     = 10
 class Sun(Scenery):
       sprite_names = ["sun"]
-      base_height  = 300
+      from_ceiling = True
+      base_height  = 50
+      stacking     = 0
+class Cloud(Scenery):
+      sprite_names = ["cloud"]
+      from_ceiling = True
+      base_height  = 150
+      hover_height = 25
+      stacking     = 6
+      const_speed  = 1.0
+      def update(self):
+          Actor.update(self)
 class Post(Scenery):
       sprite_names = ["post"]
       animate_stop = True
+      stacking     = 15
+
+# swarming demo
+class Bird(Scenery):
+      animate_stop = True
+      directed     = True
       stacking     = 5
+      base_height  = 0
+      from_ceiling = True
+class SmallBird(Bird):
+      sprite_names = ["smallbird-left", "smallbird-right"]
+      const_speed  = 2.5
+      const_accel  = 12.5
+class BigBird(Bird):
+      sprite_names = ["bigbird-left", "bigbird-right"]
+      const_speed  = 5.0
+      const_accel  = 5.0
+      in_dev_mode  = True
 
 # Characters
 class Character(Actor):
-      stacking = 10
+      stacking = 20
 
 class Dude(Character):
       const_speed  = 6.0
@@ -398,6 +418,7 @@ class Dude(Character):
       sprite_names = ["dude-left", "dude-right"]
       snd_move     = ["step", "cape1", "cape2"]
       snd_death    = ["cry"]
+      stacking     = 25
 
 class Rabbit(Character):
       const_speed  = 9.0
@@ -422,6 +443,212 @@ class Guardian(Character):
       sprite_names = ["guardian-left", "guardian-right"]
 
 # controllers
+class Controller:
+      def __init__(self, puppet):
+          self.puppet = puppet
+      def __str__(self):
+          return "%s" % (str(self.__class__).split(".")[1])
+      def debug_info(self):
+          return "%s" % (str(self))
+      def update(self):
+          pass
+
+class FlyingController(Controller):
+      def __init__(self, *args):
+          Controller.__init__(self, *args)
+          self.xdiff = self.ydiff = 0.0
+
+      def debug_info(self):
+          return "%s dir=[%.1f,%.1f]" % \
+                 (Controller.debug_info(self), self.xdiff, self.ydiff)
+      def normalize_xy(self, x, y, sum, scale_up = True, scale_down = True):
+          """
+          ensure that the cumulative vector of x,y is not smaller/larger than sum
+          """
+          # the vector length
+          real_sum = (x ** 2 + y ** 2) ** 0.5
+          if real_sum == 0:
+            return x, y
+          # scale up/down
+          mult = sum / real_sum
+          if real_sum < sum and scale_up or real_sum > sum and scale_down:
+            x *= mult
+            y *= mult
+          return x, y
+
+      def find_offset(self):
+          pass
+
+      def update(self):
+          # where to fly?
+          self.find_offset()
+
+          # face left/right
+          if self.puppet.speed > 0:
+            self.puppet.direction = 1
+          else:
+            self.puppet.direction = -1
+
+          # accelerate
+          x, y = self.normalize_xy(self.xdiff, self.ydiff, self.puppet.const_accel)
+          self.puppet.accel  = x
+          self.puppet.yaccel = y
+          # limit speed
+          x, y = self.normalize_xy(self.puppet.speed, self.puppet.yspeed, self.puppet.const_speed)
+          self.puppet.speed  = x
+          self.puppet.yspeed = y
+
+class BirdFlocker(FlyingController):
+      def __init__(self, *args):
+          FlyingController.__init__(self, *args)
+          ## flocking params
+          # grand scheme
+          self.weight_waypoint = 4.5
+          self.weight_flock    = 5.0
+          self.weight_predator = 10.0
+          self.weight_bounds   = 15.0
+          # in flock
+          self.weight_repel = 10.0
+          self.weight_group = 5.0
+          # flock shape
+          self.prefer_dist  = 5.0
+          self.group_size   = 20.0
+          self.visible_dist = 30.0
+          # random flying around points
+          self.random_waypoint()
+
+      def debug_info(self):
+          return "%s way=[%.1f,%.1f]" % \
+                 (FlyingController.debug_info(self), self.xwaypoint, self.ywaypoint)
+
+      def random_waypoint(self):
+          self.xwaypoint = random() * 200 - 100
+          self.ywaypoint = random() * 25
+
+      def find_offset(self):
+          # calculate destination, prefer waypoint
+          x, y = self.normalize_xy(self.xwaypoint - self.puppet.pos,
+                                   self.ywaypoint - self.puppet.ypos,
+                                   self.weight_waypoint)
+          self.xdiff, self.ydiff = x, y
+
+          # bounds
+          if self.puppet.ypos > 30.0:
+            self.ydiff -= self.weight_bounds
+
+          # predators
+          preds = self.puppet.world.get_actors(include = [BigBird])
+          pred_xdiff = pred_ydiff = 0.0
+          for pred in preds:
+            xdiff = pred.pos - self.puppet.pos
+            ydiff = pred.ypos - self.puppet.ypos
+            dist  = (xdiff ** 2 + ydiff ** 2) ** (0.5)
+            if dist < self.visible_dist:
+              pred_xdiff += -xdiff
+              pred_ydiff += -ydiff
+          if preds:
+            x, y = self.normalize_xy(pred_xdiff, pred_ydiff, self.weight_predator)
+            self.xdiff += x
+            self.ydiff += y
+
+          # find other birds
+          neighs = self.puppet.world.get_actors(include = [SmallBird])
+          # flocking
+          flock_xdiff = flock_ydiff = 0.0
+          for neigh in neighs:
+            if neigh == self.puppet:
+              continue
+            xdiff = neigh.pos - self.puppet.pos
+            ydiff = neigh.ypos - self.puppet.ypos
+            dist  = (xdiff ** 2 + ydiff ** 2) ** (0.5)
+            # repel if too close
+            if dist < self.prefer_dist :
+              const = (-1.0 + dist / self.prefer_dist) * self.weight_repel
+            # group locally
+            elif dist < self.group_size:
+              const = self.weight_group * (dist - self.prefer_dist) / (self.group_size - self.prefer_dist)
+            elif dist < self.visible_dist:
+              const = self.weight_group - (dist - self.group_size) / (self.visible_dist - self.group_size)
+            # ignore beyond sight
+            else:
+              const = 0.0
+            flock_xdiff += const * xdiff
+            flock_ydiff += const * ydiff
+          if neighs:
+            x, y = self.normalize_xy(flock_xdiff, flock_ydiff, self.weight_flock)
+            self.xdiff += x
+            self.ydiff += y
+
+      def update(self):
+          FlyingController.update(self)
+          # choose a next waypoint 
+          if abs(self.xwaypoint - self.puppet.pos) < 1.0 and abs(self.ywaypoint - self.puppet.ypos) < 1.0:
+            self.random_waypoint()
+
+class BirdPredator(FlyingController):
+      def __init__(self, *args):
+          FlyingController.__init__(self, *args)
+          self.random_target()
+      def debug_info(self):
+          return "%s target=[%.1f,%.1f]" % \
+                 (FlyingController.debug_info(self), self.target.pos, self.target.ypos)
+      def random_target(self):
+          birds = self.puppet.world.get_actors(include = [SmallBird])
+          self.target = birds[int(random() * len(birds))]
+      def find_offset(self):
+          self.xdiff = self.target.pos  - self.puppet.pos
+          self.ydiff = self.target.ypos - self.puppet.ypos
+      def update(self):
+          FlyingController.update(self)
+          if abs(self.target.pos - self.puppet.pos) < 1.0 and abs(self.target.ypos - self.puppet.ypos) < 1.0:
+            self.random_target()
+
+
+class FSMController(Controller):
+      states = [ "idle" ]
+      start_state = "idle"
+
+      class InvalidState(Exception):
+            def __init__(self, state):
+                self.state = state
+            def __str__(self):
+                return "Invalid state change to: %s" % (self.state)
+
+      def __init__(self, puppet):
+          Controller.__init__(self, puppet)
+          self.state   = False
+          self.set_state(self.start_state)
+      def debug_info(self):
+          return "%s [%s]" % (Controller.debug_info(self), self.state)
+
+      def set_state(self, newstate):
+          if not newstate in self.states:
+            raise self.InvalidState(newstate)
+          if newstate != self.state:
+            self.state       = newstate
+            self.state_start = self.puppet.world.get_time()
+            self.action_time = 0.0
+
+      def state_time(self):
+          return self.puppet.world.get_time() - self.state_start
+
+      def time_passed(self, duration, rand = 0.0):
+          passed = self.puppet.world.get_time() - self.action_time
+          if passed > duration + rand * random():
+            self.action_time = self.puppet.world.get_time()
+            return True
+          else:
+            return False
+
+      def update(self):
+          self.state_change()
+          self.state_action()
+      def state_change(self):
+          pass
+      def state_action(self):
+          pass
+
+
 class GuardianController(FSMController):
       states = [ "idle", "guarding" ]
       def __init__(self, puppet):
@@ -491,6 +718,7 @@ class RabbitController(FSMController):
 
       def __init__(self, *args):
           FSMController.__init__(self, *args)
+          self.last_hp  = self.puppet.hp
           self.waypoint = 0.0
 
       def debug_info(self):
@@ -500,11 +728,12 @@ class RabbitController(FSMController):
 
       def state_change(self):
           if self.state == "idle":
-            if self.last_hp * 0.99 > self.puppet.hp:
+            if self.puppet.hp - self.last_hp < -self.puppet.timediff * 1.0:
               self.set_state("flee")
           elif self.state == "flee":
             if self.state_time() > 3.0:
               self.set_state("idle")
+          self.last_hp = self.puppet.hp
 
       def state_action(self):
           if self.state == "idle":
@@ -694,3 +923,7 @@ class ControlledRabbit(Rabbit):
       control = RabbitController
 class ControlledGuardian(Guardian):
       control = GuardianController
+class FlockingSmallBird(SmallBird):
+      control = BirdFlocker
+class PredatorBird(BigBird):
+      control = BirdPredator

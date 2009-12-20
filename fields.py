@@ -46,7 +46,7 @@ class MagicField:
             self.visibility = set
       # Get the field's value at pos as translated through the view
       def sc_value(self, view, pos):
-          return pos, view.pl2sc_y(self.value(view.sc2pl_x(pos)) + 1.0)
+          return pos, view.sc_h() - (self.value(view.sc2pl_x(pos)) + 1.0) * view.sc_h() / 2.0
       def draw(self, view, screen, draw_debug = False):
           if self.visibility:
             # step should be float to cover the whole range
@@ -104,7 +104,7 @@ class MagicParticle(actors.Actor):
       hover_height = 100.0
       initial_hp   = 0
       directed     = False
-      stacking     = 20
+      stacking     = 26
 
       # Particle params
       base_dev     = 5.0

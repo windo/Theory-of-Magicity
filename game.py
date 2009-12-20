@@ -46,9 +46,17 @@ class ResourceLoader:
           self.sprite("guardian_svg", "guardian-right", 100, resize = (50, 200))
           self.sprite("guardian_svg", "guardian-left", 100, flip = True, resize = (50, 200))
 
-          self.sprite("tree", "tree", resize = (600, 400))
+          self.sprite("smallbird", "smallbird-left", 50, resize = (12, 6))
+          self.sprite("smallbird", "smallbird-right", 50, flip = True, resize = (12, 6))
+          self.sprite("bigbird", "bigbird-left", 100, resize = (25, 12))
+          self.sprite("bigbird", "bigbird-right", 100, flip = True, resize = (25, 12))
+
+          self.sprite("tree_svg", "tree", resize = (400, 400))
           self.sprite("sun", "sun", resize = (400, 400))
+          self.sprite("cloud", "cloud")
           self.sprite("post", "post", 25)
+
+          self.sprite("hills", "hills")
 
           # load sounds
           self.sounds(["cry", "cape1", "cape2", "step"])
@@ -120,7 +128,7 @@ class View:
           self.recalculate()
       def recalculate(self):
           view_w, view_h = self.view
-          plane_x1, plane_y1, plane_x2, plane_y2 = self.plane
+          plane_x1, plane_x2, plane_y1, plane_y2 = self.plane
           plane_w = plane_x2 - plane_x1
           plane_h = plane_y2 - plane_y1
           # multiplier to get plane coordinates from view coordinates
@@ -128,21 +136,21 @@ class View:
           self.mult_y = float(plane_h) / float(view_h)
           # offset to apply to plane coordinates
           self.offset_x = plane_x1
-          self.offset_y = plane_y2
+          self.offset_y = plane_y1
 
       def pl_x1(self): return self.plane[0]
-      def pl_x2(self): return self.plane[2]
-      def pl_y1(self): return self.plane[1]
+      def pl_x2(self): return self.plane[1]
+      def pl_y1(self): return self.plane[2]
       def pl_y2(self): return self.plane[3]
       def sc_w(self): return self.view[0]
       def sc_h(self): return self.view[1]
 
       def get_center_x(self):
-          return self.plane[0] + float(self.plane[2] - self.plane[0]) / 2.0
+          return self.plane[0] + float(self.plane[1] - self.plane[0]) / 2.0
       def move_x(self, x):
           self.offset_x += x
           self.plane[0] += x
-          self.plane[2] += x
+          self.plane[1] += x
       def set_x(self, x):
           diff = x - self.get_center_x()
           self.move_x(diff)
@@ -150,11 +158,11 @@ class View:
       def sc2pl_x(self, x):
           return x * self.mult_x + self.offset_x
       def sc2pl_y(self, y):
-          return self.offset_y - y * self.mult_y
+          return y * self.mult_y + self.offset_y
       def pl2sc_x(self, x):
           return (x - self.offset_x) / self.mult_x
       def pl2sc_y(self, y):
-          return (self.offset_y - y) / self.mult_y
+          return (y - self.offset_y) / self.mult_y
 
 class World:
       """
@@ -233,7 +241,7 @@ class World:
             ret.append(actor)
           return ret
       def sort_actors(self):
-          self.actors.sort(lambda x, y: cmp(x.stacking, y.stacking) or cmp(y.pos, x.pos))
+          self.actors.sort(lambda x, y: cmp(x.stacking, y.stacking) or cmp(x.pos, y.pos))
 
       # field management
       def get_field(self, fieldtype):
@@ -259,7 +267,7 @@ class Game:
           self.screen = pygame.display.set_mode(screensize, pygame.FULLSCREEN)
           #screensize  = (800, 600)
           #self.screen = pygame.display.set_mode(screensize)
-          self.view   = View(screensize, (0, 0, 100, 2))
+          self.view   = View(screensize, (0, 100, 0, 50))
 
           # loading resources
           self.loader = ResourceLoader()
@@ -387,6 +395,8 @@ class Game:
           cast_magic = False
           sel_magic  = False
 
+          background = self.loader.get_sprite("hills")
+
           while forever:
             # actors moving
             stime = time.time()
@@ -408,7 +418,7 @@ class Game:
               elif abs(diff) >= 45.0:
                 view.move_x(diff * 0.05)
           
-            # draw
+            ## draw
             # background changes slightly in color
             if world.paused():
               day = -1.0
@@ -416,25 +426,35 @@ class Game:
             else:
               day = math.sin(time.time()) + 1
               screen.fill([day * 32, 32 + day * 32, 128 + day * 32])
+
+            # background image
+            bg_w = background.get_width()
+            p    = (view.pl2sc_x(0) / 2) % bg_w - bg_w
+            for i in xrange(3):
+              screen.blit(background, (p + i * bg_w, view.sc_h() - background.get_height()))
+            
             # draw fields
             stime = time.time()
             for field in world.all_fields():
               field.draw(view, screen, draw_debug = draw_debug)
             draw_field_time = time.time() - stime
-            # draw actors (with debug data?)
+            
+            # draw actors
             debug_offset = 1
             stime = time.time()
             world.sort_actors()
             for actor in world.all_actors():
               actor.draw(screen, int(draw_debug) * debug_offset, draw_hp)
-              debug_offset = (debug_offset + 20) % (view.sc_h() - 20 - 100)
+              debug_offset = (debug_offset + 40) % (view.sc_h() - 20 - 100)
             draw_actor_time = time.time() - stime
+            
             # draw performance stats
             if draw_debug:
               fps_txt = world.loader.debugfont.render("FPS: %.1f" % (fps), True, (255, 255, 255))
               stats   = world.loader.debugfont.render("Actors: %u, Draw field=%.3f actors=%.3f, update actors=%.3f" % (len(world.all_actors()), draw_field_time, draw_actor_time, update_actor_time), True, (255, 255, 255))
               screen.blit(fps_txt, (10, 10))
               screen.blit(stats, (10, 25))
+            
             # draw magic selection
             if get_magic:
               i = 1
@@ -445,12 +465,14 @@ class Game:
                 screen.blit(ball_txt, (10, 40 + i * 20))
                 screen.blit(ball_nr, (view.pl2sc_x(ball.pos), view.sc_h() - 80))
                 i += 1
+            
             # draw storyline elements
             story.draw(screen, draw_debug = draw_debug)
+            
             # drawing done!
             pygame.display.update()
           
-            # handle events
+            ## handle events
             for event in pygame.event.get():
               if event.type == pygame.QUIT:
                 forever = False
@@ -557,13 +579,15 @@ class Game:
                 elif sel_magic and event.key == pygame.K_s:
                   player.magic.power(sel_magic, diff = -3.0)
                 elif sel_magic and event.key == pygame.K_r:
-                  player.magic.release(sel_magic)
-                  sel_magic.selected = False
-                  sel_magic = False
+                  if sel_magic:
+                    player.magic.release(sel_magic)
+                    sel_magic.selected = False
+                    sel_magic = False
                 elif event.key == pygame.K_r:
-                  player.magic.release_all()
-                  sel_magic.selected = False
-                  sel_magic = False
+                  if sel_magic:
+                    player.magic.release_all()
+                    sel_magic.selected = False
+                    sel_magic = False
 
           
               # key releases

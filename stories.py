@@ -115,6 +115,14 @@ class Shepherd(Story):
             world.new_actor(actors.Tree, -250 + (500 / 10) * i + random() * 25)
           for i in xrange(3):
             world.new_actor(actors.Sun, -250 + (500 / 3) * i + random() * 25)
+          for i in xrange(6):
+            world.new_actor(actors.Cloud, -250 + (500 / 6) * i + random() * 25)
+          for i in xrange(25):
+            bird = world.new_actor(actors.FlockingSmallBird, random() * 100)
+            bird.ypos = random() * 10.0
+          for i in xrange(1):
+            bird = world.new_actor(actors.PredatorBird, random() * 100)
+            bird.ypos = random() * 10.0
 
           # paint the destination
           world.new_actor(actors.Post, 50)
@@ -308,6 +316,14 @@ class Salvation(Story):
             world.new_actor(actors.Tree, -250 + (500 / 10) * i + random() * 25)
           for i in xrange(3):
             world.new_actor(actors.Sun, -250 + (500 / 3) * i + random() * 25)
+          for i in xrange(6):
+            world.new_actor(actors.Cloud, -250 + (500 / 6) * i + random() * 25)
+          for i in xrange(25):
+            bird = world.new_actor(actors.FlockingSmallBird, random() * 100)
+            bird.ypos = random() * 10.0
+          for i in xrange(1):
+            bird = world.new_actor(actors.PredatorBird, random() * 100)
+            bird.ypos = random() * 10.0
 
           # paint the destination
           world.new_actor(actors.Post, 0.0)
@@ -489,6 +505,14 @@ class Blockade(Story):
             world.new_actor(actors.Tree, -250 + (500 / 10) * i + random() * 25)
           for i in xrange(3):
             world.new_actor(actors.Sun, -250 + (500 / 3) * i + random() * 25)
+          for i in xrange(6):
+            world.new_actor(actors.Cloud, -250 + (500 / 6) * i + random() * 25)
+          for i in xrange(25):
+            bird = world.new_actor(actors.FlockingSmallBird, random() * 100)
+            bird.ypos = random() * 10.0
+          for i in xrange(1):
+            bird = world.new_actor(actors.PredatorBird, random() * 100)
+            bird.ypos = random() * 10.0
 
           # enemies
           world.new_actor(actors.ControlledGuardian, 50)
