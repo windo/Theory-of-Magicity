@@ -63,10 +63,10 @@ class MagicField:
               pygame.draw.line(screen, color, this, next, 3)
               if draw_debug:
                 if pos % (self.drawpoints / 5) == 0:
-                  at    = view.sc2pl_x(pos * step)
-                  val   = self.value(at)
-                  txt   = "%s.value(%.2f:%.2f) = %.2f" % (str(self.__class__).split(".")[1], pos, at, val)
-                  txt   = self.loader.debugfont.render(txt, True, (255, 255, 255))
+                  at  = view.sc2pl_x(pos * step)
+                  val = self.value(at)
+                  txt = "%s.value(%.2f:%.2f) = %.2f" % (str(self.__class__).split(".")[1], pos, at, val)
+                  txt = self.loader.debugfont.render(txt, True, (255, 255, 255))
                   screen.blit(txt, this)
               # move on
               this = next
@@ -166,7 +166,8 @@ class MagicParticle(actors.Actor):
           actors.Actor.update(self)
 
           # update fancy graphics drawers
-          value = self.field.value(self.pos)
+          #value = self.field.value(self.pos)
+          value = self.mult / 10.0
           if len(self.particle_effects) == 1:
             self.particle_effects[0].update(value)
           else:

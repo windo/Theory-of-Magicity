@@ -7,7 +7,7 @@ from operator import attrgetter
 import pygame
 from pygame.locals import *
 
-import actors, fields, stories
+import actors, fields, stories, effects
 
 class ResourceLoader:
       """
@@ -21,10 +21,11 @@ class ResourceLoader:
             def __str__(self):
                 return "No Image %s" % (self.name) 
 
-      def __init__(self):
+      def __init__(self, screen):
           self.spritelists = {}
           self.imagelist   = {}
           self.soundlist   = {}
+          self.screen      = screen
 
           # load fonts
           self.biggoth   = pygame.font.Font("font/Deutsch.ttf", 104)
@@ -55,6 +56,7 @@ class ResourceLoader:
           self.sprite("sun", "sun", resize = (400, 400))
           self.sprite("cloud", "cloud")
           self.sprite("post", "post", 25)
+          self.sprite("hut", "hut")
 
           self.sprite("hills", "hills")
 
@@ -77,6 +79,7 @@ class ResourceLoader:
               if resize:
                 # TODO: newer pygame could use smoothscale
                 img = pygame.transform.scale(img, resize)
+              img = img.convert_alpha(self.screen)
               self.spritelists[listname] = [img]
             else:
               # use all subsurfaces?
@@ -90,6 +93,8 @@ class ResourceLoader:
                   subimg = pygame.transform.flip(subimg, True, False)
                 if resize:
                   subimg = pygame.transform.scale(subimg, resize)
+                # TODO: does this help at all?
+                subimg = subimg.convert_alpha(self.screen)
                 self.spritelists[listname].append(subimg)
 
       def get_sprite(self, name):
@@ -123,9 +128,17 @@ class View:
           view is (width, height) - input/output scale
           plane is (x1, y1, x2, y2) - the MagicField area to fit in the view
           """
-          self.view  = list(view)
-          self.plane = list(plane)
+          # screen / plane
+          self.view   = list(view)
+          self.plane  = list(plane)
           self.recalculate()
+          # camera
+          self.anchor    = 0.0
+          self.pan       = False # smooth scroll
+          self.find_time = 0.5   # seconds
+          self.pan_speed = 50.0  # pos/sec
+          self.last_time = time.time()
+
       def recalculate(self):
           view_w, view_h = self.view
           plane_x1, plane_x2, plane_y1, plane_y2 = self.plane
@@ -145,6 +158,7 @@ class View:
       def sc_w(self): return self.view[0]
       def sc_h(self): return self.view[1]
 
+      # camera stuff
       def get_center_x(self):
           return self.plane[0] + float(self.plane[1] - self.plane[0]) / 2.0
       def move_x(self, x):
@@ -154,6 +168,52 @@ class View:
       def set_x(self, x):
           diff = x - self.get_center_x()
           self.move_x(diff)
+
+      def goto(self, anchor):
+          if isinstance(anchor, actors.Actor):
+            self.set_x(anchor.pos)
+          else:
+            self.set_x(anchor)
+      def follow(self, anchor, immediate = False, pan = False):
+          self.anchor = anchor
+          self.pan    = pan
+          if immediate:
+            self.goto(anchor)
+      def update(self):
+          # passed time
+          timediff = min(time.time() - self.last_time, 0.1)
+          self.last_time = time.time()
+          # noone to follow?
+          if not self.anchor:
+            return
+          # follow
+          if isinstance(self.anchor, actors.Actor):
+            dst  = self.anchor.pos
+            # TODO: should use real movement speed
+            dst += self.anchor.speed * 5.0
+          else:
+            dst = self.anchor
+          diff = dst - self.get_center_x()
+
+          # movement
+          if self.pan:
+            # move with constant speed
+            if diff > 0: dir = +1
+            else:        dir = -1
+            movement = dir * self.pan_speed * timediff
+            # end the pan
+            if abs(diff) < 10.0:
+              self.pan = False
+            else:
+              self.move_x(movement)
+          else:
+            if abs(diff) < 5.0:
+              const = 0.0
+            elif abs(diff) < 10.0:
+              const = (abs(diff) - 5.0) / 5.0
+            else:
+              const = 1.0
+            self.move_x(diff * const * timediff / self.find_time)
 
       def sc2pl_x(self, x):
           return x * self.mult_x + self.offset_x
@@ -286,7 +346,7 @@ class Game:
           self.view   = View(screensize, (0, 100, 0, 50))
 
           # loading resources
-          self.loader = ResourceLoader()
+          self.loader = ResourceLoader(self.screen)
           # for title screen
           self.loader.sprite("title-bg", resize = screensize)
 
@@ -314,6 +374,7 @@ class Game:
                   { "id":  "shepherd", "txt": "Gentle Shepherd" },
                   { "id":  "salvation", "txt": "Rabbits` Salvation" },
                   { "id":  "blockade", "txt": "Guardian Blockade" },
+                  { "id":  "siege", "txt": "Under Siege" },
                   { "id":  "exit", "txt": "Exit Game" },
                  ]
           for item in menu:
@@ -368,6 +429,9 @@ class Game:
                   elif action == "blockade":
                     self.set_music("warmarch2")
                     self.run_story(stories.Blockade)
+                  elif action == "siege":
+                    self.set_music("warmarch2")
+                    self.run_story(stories.Siege)
                   self.set_music("happytheme")
 
             # stay in menu
@@ -391,20 +455,28 @@ class Game:
           forever = True
 
           # calibrating game speed
-          lasttime   = int(time.time())
+          lasttime   = 0
           frames     = 0
           lastframes = 0
           fps        = 0
+          fps_img    = False
 
           # performance debugging stats
-          draw_field_time = 0
-          draw_actor_time = 0
-          update_actor_time = 0
+          update_time         = 0
+          update_actors_time  = 0
+          update_story_time   = 0
+          update_display_time = 0
+          draw_time        = 0
+          draw_bg_time     = 0
+          draw_fields_time = 0
+          sort_time        = 0
+          draw_actors_time = 0
+          draw_magic_time  = 0
+          draw_misc_time   = 0
 
           # extra debugging(?) output
           draw_hp     = True
           draw_debug  = False
-          free_camera = False
 
           # input states
           get_magic  = False
@@ -412,27 +484,26 @@ class Game:
           sel_magic  = False
 
           while forever:
+            ## update
+            update_stime = actors_stime = time.time()
             # actors moving
-            stime = time.time()
             if not world.paused():
               for actor in world.all_actors():
                 actor.update()
-            update_actor_time = time.time() - stime
+            update_actors_time = time.time() - actors_stime
 
             # storyline evolving
+            story_stime = time.time()
             story.update()
+            update_story_time = time.time() - story_stime
           
             # center view on player
-            if not free_camera:
-              diff = player.pos - view.get_center_x()
-              if 30.0 > abs(diff) > 5.0:
-                view.move_x(diff * 0.01)
-              elif 45.0 > abs(diff) >= 30.0:
-                view.move_x(diff * 0.02)
-              elif abs(diff) >= 45.0:
-                view.move_x(diff * 0.05)
+            view.update()
+
+            update_time = time.time() - update_stime
           
             ## draw
+            draw_stime = bg_stime = time.time()
             # background changes slightly in color
             if world.paused():
               day = -1.0
@@ -443,28 +514,56 @@ class Game:
 
             # background image
             world.draw_background(screen, draw_debug)
+            draw_bg_time = time.time() - bg_stime
             
             # draw fields
-            stime = time.time()
+            fields_stime = time.time()
             for field in world.all_fields():
               field.draw(view, screen, draw_debug = draw_debug)
-            draw_field_time = time.time() - stime
+            draw_fields_time = time.time() - fields_stime
             
             # draw actors
-            debug_offset = 1
-            stime = time.time()
+            sort_stime = time.time()
             world.sort_actors()
-            for actor in world.all_actors():
+            sort_time = time.time() - sort_stime
+
+            actors_stime = time.time()
+            debug_offset = 1
+            for actor in world.get_actors(exclude = [fields.MagicParticle]):
               actor.draw(screen, int(draw_debug) * debug_offset, draw_hp)
               debug_offset = (debug_offset + 40) % (view.sc_h() - 20 - 100)
-            draw_actor_time = time.time() - stime
+            draw_actors_time = time.time() - actors_stime
+            # magicparticles
+            magic_stime = time.time()
+            for actor in world.get_actors(include = [fields.MagicParticle]):
+              actor.draw(screen, int(draw_debug) * debug_offset, draw_hp)
+              debug_offset = (debug_offset + 40) % (view.sc_h() - 20 - 100)
+            draw_magic_time = time.time() - magic_stime
             
+            misc_stime = time.time()
+            # draw storyline elements
+            story.draw(screen, draw_debug = draw_debug)
+
             # draw performance stats
             if draw_debug:
-              fps_txt = world.loader.debugfont.render("FPS: %.1f" % (fps), True, (255, 255, 255))
-              stats   = world.loader.debugfont.render("Actors: %u, Draw field=%.3f actors=%.3f, update actors=%.3f" % (len(world.all_actors()), draw_field_time, draw_actor_time, update_actor_time), True, (255, 255, 255))
-              screen.blit(fps_txt, (10, 10))
-              screen.blit(stats, (10, 25))
+              if int(time.time()) != lasttime or not fps_img:
+                fps_txt        = "FPS: %.1f" % (fps)
+                draw_times_txt = "DRAW=%.3f (bg=%.3f fields=%.3f sort=%.3f actors=%.3f magic=%.3f misc=%.3f)" % \
+                                 (draw_time * 1000, draw_bg_time * 1000, draw_fields_time * 1000, sort_time * 1000,
+                                 draw_actors_time * 1000, draw_magic_time * 1000, draw_misc_time * 1000)
+                update_times_txt = "Actors=%u, cch=%u, ccm=%u UPDATE=%.3f (actors=%.3f story=%.3f) display.update=%.3f" % \
+                                   (len(world.all_actors()), effects.circle_cache_hit, effects.circle_cache_miss,
+                                   update_time * 1000, update_actors_time * 1000,
+                                    update_story_time * 1000, update_display_time * 1000)
+                fps_img      = world.loader.debugfont.render(fps_txt, True, (255, 255, 255))
+                draw_times   = world.loader.debugfont.render(draw_times_txt, True, (255, 255, 255))
+                update_times = world.loader.debugfont.render(update_times_txt, True, (255, 255, 255))
+              screen.fill((0,0,0), (10, 10, fps_img.get_width(), fps_img.get_height()))
+              screen.fill((0,0,0), (10, 30, draw_times.get_width(), draw_times.get_height()))
+              screen.fill((0,0,0), (10, 50, update_times.get_width(), update_times.get_height()))
+              screen.blit(fps_img, (10, 10))
+              screen.blit(draw_times, (10, 30))
+              screen.blit(update_times, (10, 50))
             
             # draw magic selection
             if get_magic:
@@ -476,12 +575,13 @@ class Game:
                 screen.blit(ball_txt, (10, 40 + i * 20))
                 screen.blit(ball_nr, (view.pl2sc_x(ball.pos), view.sc_h() - 80))
                 i += 1
-            
-            # draw storyline elements
-            story.draw(screen, draw_debug = draw_debug)
+            draw_misc_time = time.time() - misc_stime
+            draw_time = time.time() - draw_stime
             
             # drawing done!
+            display_stime = time.time()
             pygame.display.update()
+            update_display_time = time.time() - display_stime
           
             ## handle events
             for event in pygame.event.get():
@@ -503,12 +603,12 @@ class Game:
                   player.move_right()
 
                 elif event.key == pygame.K_j:
-                  free_camera = True
+                  view.follow(False)
                   view.move_x(-10.0)
                 elif event.key == pygame.K_k:
-                  free_camera = False
+                  view.follow(player)
                 elif event.key == pygame.K_l:
-                  free_camera = True
+                  view.follow(False)
                   view.move_x(+10.0)
           
                 # mode switching

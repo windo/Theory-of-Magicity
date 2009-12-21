@@ -385,10 +385,14 @@ class Cloud(Scenery):
       stacking     = 6
       const_speed  = 1.0
       def update(self):
+          # TODO: slow flying around
           Actor.update(self)
 class Post(Scenery):
       sprite_names = ["post"]
       animate_stop = True
+      stacking     = 15
+class Hut(Scenery):
+      sprite_names = ["hut"]
       stacking     = 15
 
 # swarming demo
@@ -406,7 +410,6 @@ class BigBird(Bird):
       sprite_names = ["bigbird-left", "bigbird-right"]
       const_speed  = 5.0
       const_accel  = 5.0
-      in_dev_mode  = True
 
 # Characters
 class Character(Actor):
@@ -419,6 +422,7 @@ class Dude(Character):
       snd_move     = ["step", "cape1", "cape2"]
       snd_death    = ["cry"]
       stacking     = 25
+      in_dev_mode  = True
 
 class Rabbit(Character):
       const_speed  = 9.0
@@ -434,6 +438,7 @@ class Dragon(Character):
       sprite_names = ["dragon-left", "dragon-right"]
       snd_move     = ["crackle1", "crackle2"]
       snd_death    = ["moan1", "moan2"]
+      in_dev_mode  = True
 
 class Guardian(Character):
       const_speed    = 0.5
@@ -544,8 +549,8 @@ class BirdFlocker(FlyingController):
             ydiff = pred.ypos - self.puppet.ypos
             dist  = (xdiff ** 2 + ydiff ** 2) ** (0.5)
             if dist < self.visible_dist:
-              pred_xdiff += -xdiff
-              pred_ydiff += -ydiff
+              pred_xdiff += -xdiff * (1 - dist / self.visible_dist)
+              pred_ydiff += -ydiff * (1 - dist / self.visible_dist)
           if preds:
             x, y = self.normalize_xy(pred_xdiff, pred_ydiff, self.weight_predator)
             self.xdiff += x
@@ -713,7 +718,7 @@ class GuardianController(FSMController):
               elif value > dest_value:
                 self.puppet.magic.power(self.shot, -self.puppet.magic_energy)
 
-class RabbitController(FSMController):
+class WimpyController(FSMController):
       states   = [ "idle", "flee" ]
 
       def __init__(self, *args):
@@ -759,7 +764,7 @@ class RabbitController(FSMController):
               else:
                 self.puppet.move_right()
 
-class DragonController(FSMController):
+class HunterController(FSMController):
       states = [ "idle", "follow", "shoot", "evade", "heal" ]
       def __init__(self, puppet):
           FSMController.__init__(self, puppet)
@@ -768,7 +773,12 @@ class DragonController(FSMController):
           self.waypoint = 0.0
 
       def debug_info(self):
-          return "%s target=%s waypoint=%3f" % (FSMController.debug_info(self), self.target, self.waypoint)
+          if self.target:
+            target_pos = self.target.pos
+          else:
+            target_pos = 0
+          return "%s target=%s (%3f) waypoint=%3f" % \
+                 (FSMController.debug_info(self), self.target, target_pos, self.waypoint)
       def set_waypoint(self, waypoint):
           self.waypoint = waypoint
 
@@ -785,7 +795,7 @@ class DragonController(FSMController):
           return found
       # look for nearby actors and decide who to attack
       def acquire_target(self):
-          new_target = self.nearby(75, [Dude, Rabbit])
+          new_target = self.nearby(75, self.puppet.prey)
           if new_target:
             self.target = new_target
       # look for nearby particles and decide which one to evade
@@ -857,12 +867,12 @@ class DragonController(FSMController):
           elif self.state == "follow":
             self.acquire_particle()
             if self.time_passed(1.0, 1.0):
-              if self.target.pos - self.puppet.pos > 50.0:
+              if abs(self.target.pos - self.puppet.pos) > 50.0:
                 if self.target.pos > self.puppet.pos:
                   self.puppet.move_right()
                 else:
                   self.puppet.move_left()
-              elif self.target.pos - self.puppet.pos < 25.0:
+              elif abs(self.target.pos - self.puppet.pos) < 25.0:
                 if self.target.pos > self.puppet.pos:
                   self.puppet.move_left()
                 else:
@@ -917,13 +927,17 @@ class DragonController(FSMController):
             else:
               self.puppet.magic.move(self.shot, -1.0)
 
-class ControlledDragon(Dragon):
-      control = DragonController
-class ControlledRabbit(Rabbit):
-      control = RabbitController
+class HuntingDragon(Dragon):
+      control = HunterController
+      prey    = [Dude, Rabbit]
+class HuntingDude(Dude):
+      control = HunterController
+      prey    = [Dragon]
+class ScaredRabbit(Rabbit):
+      control = WimpyController
 class ControlledGuardian(Guardian):
       control = GuardianController
-class FlockingSmallBird(SmallBird):
+class FlockingBird(SmallBird):
       control = BirdFlocker
 class PredatorBird(BigBird):
       control = BirdPredator
