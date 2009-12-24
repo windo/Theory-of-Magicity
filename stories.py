@@ -20,19 +20,20 @@ class Story:
           Reused a lot of times
           """
           world = self.world
-          world.add_background("hills")
+          world.new_actor(actors.BackgroundHills, 0)
           # paint some scenery
           for i in xrange(10):
             world.new_actor(actors.Tree, -250 + (500 / 10) * i + random() * 25)
           for i in xrange(3):
-            world.new_actor(actors.Sun, -250 + (500 / 3) * i + random() * 25)
+            world.new_actor(actors.Sun, -1200 + (2500 / 3) * i)
           for i in xrange(6):
-            world.new_actor(actors.Cloud, -250 + (500 / 6) * i + random() * 25)
+            world.new_actor(actors.Cloud, -1200 + (2500 / 6) * i)
+
           for i in xrange(25):
-            bird = world.new_actor(actors.FlockingBird, random() * 100)
-            bird.ypos = random() * 10.0
-          for i in xrange(1):
-            bird = world.new_actor(actors.PredatorBird, random() * 100)
+            bird = world.new_actor(actors.FlockingBird, random() * 1000 - 500)
+            bird.ypos = random() * bird.controller.ypos_upper_bound
+          for i in xrange(2):
+            bird = world.new_actor(actors.PredatorBird, random() * 1000 - 500)
             bird.ypos = random() * 10.0
 
       # all narrations done!

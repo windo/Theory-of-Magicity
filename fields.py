@@ -17,7 +17,7 @@ class MagicField:
 
       # could be overloaded
       def value(self, pos):
-          v = self.particle_values(pos) + 0.003 * random()
+          v = self.particle_values(pos)
           #if abs(v) > 0.2:
           #  print (pos, v)
           return v
@@ -38,9 +38,6 @@ class MagicField:
           return v
 
       # Get the field's value at pos as translated through the view
-      def sc_value(self, view, pos):
-          value = self.value(view.sc2pl_x(pos))
-          return pos, view.sc_h() - (value + 1.0) * view.sc_h() / 2.0, value
       def draw(self, view, screen, draw_debug = False):
           # step should be float to cover the whole range
           step = float(view.sc_w()) / float(self.drawpoints)
@@ -57,7 +54,6 @@ class MagicField:
               screen.blit(s, (pos, ypos))
               if draw_debug and i % (self.drawpoints / 5) == 0:
                 at  = view.sc2pl_x(pos)
-                val = self.value(at)
                 txt = "%s.value(%.2f:%.2f) = %.2f" % (str(self.__class__).split(".")[1], i, at, value)
                 txt = self.loader.debugfont.render(txt, True, (255, 255, 255))
                 screen.blit(txt, (pos, ypos))
@@ -187,8 +183,8 @@ class MagicParticle(actors.Actor):
           else:
             self.deadtimer = False
 
-      def draw(self, screen, draw_debug = False, draw_hp = False):
-          actors.Actor.draw(self, screen, draw_debug, draw_hp)
+      def draw(self, screen, draw_debug = False):
+          actors.Actor.draw(self, screen, draw_debug)
           # draw magic "ball"
           radius = 25
           x      = self.world.view.pl2sc_x(self.pos)

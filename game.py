@@ -242,7 +242,6 @@ class World:
             field = fieldtype(loader)
             self.fields[fieldtype] = field
           self.actors  = []
-          self.backgrounds = []
 
       def get_time(self):
           if self.pause_start:
@@ -309,21 +308,6 @@ class World:
           return self.fields[fieldtype]
       def all_fields(self):
           return self.fields.values()
-
-      # backgrounds
-      def add_background(self, name, distance = 2.0):
-          img = self.loader.get_sprite(name)
-          self.backgrounds.append((img, distance))
-          self.backgrounds.sort(lambda x, y: cmp(y[1], x[1]))
-          
-      def draw_background(self, screen, draw_debug = False):
-          for bg, distance in self.backgrounds:
-            bg_w   = bg.get_width()
-            bg_h   = bg.get_height()
-            offset = (self.view.pl2sc_x(0) / distance) % bg_w - bg_w
-            count  = int(self.view.sc_w() / bg_w) + 2
-            for i in xrange(count):
-              screen.blit(bg, (offset + i * bg_w, self.view.sc_h() - bg_h))
 
 class Game:
       """
@@ -476,7 +460,6 @@ class Game:
           draw_misc_time   = 0
 
           # extra debugging(?) output
-          draw_hp     = True
           draw_debug  = False
 
           # input states
@@ -512,16 +495,6 @@ class Game:
               day = math.sin(time.time()) + 1
               screen.fill([day * 32, 32 + day * 32, 128 + day * 32])
 
-            # background image
-            world.draw_background(screen, draw_debug)
-            draw_bg_time = time.time() - bg_stime
-            
-            # draw fields
-            fields_stime = time.time()
-            for field in world.all_fields():
-              field.draw(view, screen, draw_debug = draw_debug)
-            draw_fields_time = time.time() - fields_stime
-            
             # draw actors
             sort_stime = time.time()
             world.sort_actors()
@@ -530,16 +503,22 @@ class Game:
             actors_stime = time.time()
             debug_offset = 1
             for actor in world.get_actors(exclude = [fields.MagicParticle]):
-              actor.draw(screen, int(draw_debug) * debug_offset, draw_hp)
+              actor.draw(screen, int(draw_debug) * debug_offset)
               debug_offset = (debug_offset + 40) % (view.sc_h() - 20 - 100)
             draw_actors_time = time.time() - actors_stime
             # magicparticles
             magic_stime = time.time()
             for actor in world.get_actors(include = [fields.MagicParticle]):
-              actor.draw(screen, int(draw_debug) * debug_offset, draw_hp)
+              actor.draw(screen, int(draw_debug) * debug_offset)
               debug_offset = (debug_offset + 40) % (view.sc_h() - 20 - 100)
             draw_magic_time = time.time() - magic_stime
-            
+
+            # draw fields
+            fields_stime = time.time()
+            for field in world.all_fields():
+              field.draw(view, screen, draw_debug = draw_debug)
+            draw_fields_time = time.time() - fields_stime
+
             misc_stime = time.time()
             # draw storyline elements
             story.draw(screen, draw_debug = draw_debug)
@@ -555,9 +534,11 @@ class Game:
                                    (len(world.all_actors()), effects.circle_cache_hit, effects.circle_cache_miss,
                                    update_time * 1000, update_actors_time * 1000,
                                     update_story_time * 1000, update_display_time * 1000)
-                fps_img      = world.loader.debugfont.render(fps_txt, True, (255, 255, 255))
-                draw_times   = world.loader.debugfont.render(draw_times_txt, True, (255, 255, 255))
-                update_times = world.loader.debugfont.render(update_times_txt, True, (255, 255, 255))
+                font         = world.loader.debugfont
+                color        = (255, 255, 255)
+                fps_img      = font.render(fps_txt, True, color)
+                draw_times   = font.render(draw_times_txt, True, color)
+                update_times = font.render(update_times_txt, True, color)
               screen.fill((0,0,0), (10, 10, fps_img.get_width(), fps_img.get_height()))
               screen.fill((0,0,0), (10, 30, draw_times.get_width(), draw_times.get_height()))
               screen.fill((0,0,0), (10, 50, update_times.get_width(), update_times.get_height()))
@@ -613,7 +594,6 @@ class Game:
           
                 # mode switching
                 elif event.key == pygame.K_TAB:
-                  #draw_hp    = not draw_hp
                   draw_debug = not draw_debug
                 elif event.key == pygame.K_LCTRL or event.key == pygame.K_RCTRL:
                   get_magic  = True

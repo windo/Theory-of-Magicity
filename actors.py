@@ -1,12 +1,351 @@
 import pygame, math, time
 from random import random
 
+class Drawable:
+      """
+      All game objects that have a position in the game world and may be drawn.
+
+      This includes background images, scenery objects and characters
+      """
+      ## animation conf
+      # animate when not moving?
+      animate_stop = False
+      # how often to switch frames
+      anim_speed   = 1.0
+      # different images for left/right direction?
+      directed     = False
+      # order of drawing (lower stacking is drawed first)
+      stacking     = 0
+      # background objects move slower than foreground
+      distance     = 1.0
+
+      ## vertical position
+      # wobble up and down to this amount
+      hover_height = 0.0
+      # distance from edge of screen
+      base_height  = 0.0
+      # position is counted from upper edge of screen
+      from_ceiling = False
+
+      # if draw_debug has any effect on this actor class
+      in_dev_mode    = False
+
+      def __init__(self, world, pos):
+          self.world  = world
+          # movement params
+          self.pos    = pos
+          self.speed  = 0.0
+          self.accel  = 0.0
+          # only used for the background birds ATM
+          self.ypos   = 0.0
+          self.yspeed = 0.0
+          self.yaccel = 0.0
+
+          # animation params
+          self.start_time = time.time()
+          self.rnd_time_offset = random() * 25.0
+          self.direction  = -1
+          self.animate    = self.animate_stop
+
+          # load images
+          if len(self.sprite_names):
+            if self.directed:
+              self.img_left  = world.loader.get_spritelist(self.sprite_names[0])
+              self.img_right = world.loader.get_spritelist(self.sprite_names[1])
+              self.img_count = len(self.img_left)
+              self.img_w     = self.img_left[0].get_width()
+              self.img_h     = self.img_left[0].get_height()
+            else:
+              self.img_list  = world.loader.get_spritelist(self.sprite_names[0])
+              self.img_count = len(self.img_list)
+              self.img_w     = self.img_list[0].get_width()
+              self.img_h     = self.img_list[0].get_height()
+            self.cur_img_idx = 0
+          else:
+            # no image, use dummy values
+            # TODO: should do something more intelligent for particle effects - they may be wider
+            self.img_w = 100
+            self.img_h = 100
+
+      def destroy(self):
+          # no more updates or drawing
+          self.world.del_actor(self)
+
+      # used for drawing debug information - may overload to add more information
+      def __str__(self):
+          return "%s(0x%s)" % (str(self.__class__).split(".")[1], id(self))
+      def debug_info(self):
+          return "%s pos=(%.1f, %.1f) speed=(%.1f, %.1f)" % (str(self), self.pos, self.ypos, self.speed, self.yspeed)
+
+      def update(self):
+          """
+          Periodic chance do update any parameters, called regularily from the game main loop
+          """
+          # should overload, if anything to do
+          pass
+
+      def get_xy(self):
+          """
+          x - center of image
+          y - top edge of image
+          """
+          view = self.world.view
+          # center of image
+          x = view.pl2sc_x(self.pos) / self.distance
+
+          # hovering in air (slightly wobbling up and down)
+          if self.hover_height:
+            hover = self.hover_height + self.hover_height * \
+                    math.sin((time.time() + self.rnd_time_offset - self.start_time) * 2) * 0.3
+          else:
+            hover = 0.0
+          
+          # top edge
+          y = view.pl2sc_y(self.ypos) / self.distance + hover + self.base_height
+          if not self.from_ceiling:
+            y = view.sc_h() - self.img_h - y
+
+          return x, y
+      def draw(self, screen, draw_debug = False):
+          """
+          Draw the image on screen, called in sequence from main game loop for each actor
+          """
+          x, y = self.get_xy()
+
+          # do not draw off-the screen actors
+          if x + self.img_w / 2 < 0 or x - self.img_w / 2 > self.world.view.sc_w():
+            return
+
+          # draw debugging information
+          if draw_debug and self.in_dev_mode:
+            lines = self.debug_info().split("\n")
+            txts  = []
+            for line in lines:
+              txts.append(self.world.loader.debugfont.render(line, True, (255, 255, 255)))
+            i = 0
+            for txt in txts:
+              screen.blit(txt, (x, int(draw_debug) + 20 + i * 20))
+              i += 1
+
+          # do not draw/animate spriteless actors
+          if len(self.sprite_names) == 0:
+            return
+
+          # facing direction
+          if self.directed:
+            if self.direction > 0:
+              imglist = self.img_right
+            else:
+              imglist = self.img_left
+          # non-directional
+          else:
+            imglist = self.img_list
+
+          # to animate or not to animate
+          if self.animate:
+            self.cur_img_idx = int(time.time() * self.img_count * self.anim_speed) % self.img_count
+          else:
+            self.cur_img_idx = 0
+
+          # actual drawing
+          img = imglist[self.cur_img_idx]
+          screen.blit(img, (x - self.img_w / 2, y))
+
+class Actor(Drawable):
+      """
+      Game object that moves around, may have health and a controlling class
+      """
+      # animation params
+      directed = True
+
+      ## movement params
+      const_speed = 0.0
+      const_accel = 0.0
+      # if false, no magic field effects are calculated
+      feel_magic  = True
+
+      ## sounds
+      # sounds created during movement
+      snd_move     = []
+      # sounds to make upon death
+      snd_death    = []
+      # TODO: idle sounds, creation sounds?
+
+      # char attributes
+      initial_hp     = 100.0
+      regeneration   = 0.5  # hp/sec
+      initial_energy = 10.0 # magic energy
+      
+      # controller class (state machine or other)
+      control          = None
+      control_interval = 0.05
+
+      def __init__(self, world, pos):
+          Drawable.__init__(self, world, pos)
+
+          # field references for convenience
+          self.LightField = self.world.get_field(fields.LightField)
+          self.EnergyField = self.world.get_field(fields.EnergyField)
+          self.EarthField = self.world.get_field(fields.EarthField)
+
+          # actor clock, used to calibrate movement/damage/etc during update
+          self.last_update  = world.get_time()
+          self.last_control = world.get_time()
+          self.timediff     = 0.0
+
+          # used to throttle movement sound effects
+          self.next_sound = 0.0
+
+          # character params
+          self.hp           = self.initial_hp
+          self.magic_energy = self.initial_energy
+          # manages the magic particles and energy budget
+          self.magic        = MagicCaster(self)
+          # not yet...
+          self.dead         = False
+
+          # instantiate the controller class, if any
+          if self.control:
+            self.controller = self.control(self)
+          else:
+            self.controller = None
+
+      def destroy(self):
+          Drawable.destroy(self)
+          # no more magic balls for the dead
+          self.magic.release_all()
+
+      def debug_info(self):
+          desc = Drawable.debug_info(self)
+          if self.controller:
+            desc += "\nController: %s" % (self.controller.debug_info())
+          return desc
+
+      # play sounds - called from other parts of the class (update() for example)
+      def in_range(self):
+          return self.pos > self.world.view.pl_x1() and self.pos < self.world.view.pl_x2()
+      def movement_sound(self):
+          if self.snd_move and self.in_range() and self.next_sound < self.world.get_time():
+            self.next_sound = self.world.get_time() + 1.0 + random()
+            count = len(self.snd_move)
+            sound = self.snd_move[int(random() * count)]
+            self.world.loader.play_sound(sound)
+      def death_sound(self):
+          if self.snd_death and self.in_range():
+            count = len(self.snd_death)
+            sound = self.snd_death[int(random() * count)]
+            self.world.loader.play_sound(sound)
+
+      # moving the actor - called from self.controller or main game loop for the protagonist
+      def move_left(self):
+          if not self.const_accel:
+            self.speed   = -self.const_speed
+          else:
+            self.accel   = -self.const_accel
+          self.animate   = True
+          self.direction = -1
+          self.movement_sound()
+      def move_right(self):
+          if not self.const_accel:
+            self.speed   = self.const_speed
+          else:
+            self.accel   = self.const_accel
+          self.animate   = True
+          self.direction = 1
+          self.movement_sound()
+      def stop(self):
+          if not self.const_accel:
+            self.speed   = 0
+          else:
+            self.accel   = 0
+          self.animate   = self.animate_stop
+
+      def update(self):
+          """
+          Update actor parameters - called from main game loop in sequence for each actor
+          """
+          # update actor clock
+          now              = self.world.get_time()
+          self.timediff    = now - self.last_update
+          self.last_update = now
+          
+          if self.feel_magic:
+            energyfield = self.EnergyField.value(self.pos)
+            lightfield  = self.LightField.value(self.pos)
+            earthfield  = self.EarthField.value(self.pos)
+            
+          # update movement
+          if self.const_speed or self.const_accel:
+            # normal movement
+            self.speed  += self.timediff * self.accel
+            self.yspeed += self.timediff * self.yaccel
+            # magical movement
+            if self.feel_magic:
+              magic_speed = energyfield * 10.0
+              magic_mult  = lightfield
+              if magic_mult > 0:
+                magic_mult *= 5.0
+              else:
+                magic_mult *= 1.0
+              magic_mult   += 1.0
+            else:
+              magic_speed = 0.0
+              magic_mult  = 1.0
+            # update position
+            self.pos   += magic_mult * self.timediff * (self.speed + magic_speed)
+            self.ypos  += magic_mult * self.timediff * self.yspeed
+            if self.animate:
+              self.movement_sound()
+
+          # update hp
+          if self.initial_hp and self.feel_magic:
+            light_damage  = abs(lightfield)    * 10.0
+            energy_damage = abs(energyfield)   * 10.0
+            earth_damage  = max(earthfield, 0) * 25.0
+            self.hp -= self.timediff * (light_damage + energy_damage + earth_damage)
+            if self.hp < self.initial_hp:
+              magic_regen = max(-earthfield, 0) * 12.5
+              self.hp += self.timediff * (self.regeneration + magic_regen)
+            if self.hp > self.initial_hp:
+              self.hp = self.initial_hp
+            # death
+            if self.hp <= 0 and self.initial_hp:
+              self.dead = True
+              self.death_sound()
+              self.destroy()
+
+          # set magic energy
+          if self.initial_energy and self.feel_magic:
+            magic_mult = earthfield / 2.0 + 1.0
+            self.magic_energy = magic_mult * self.initial_energy
+          
+          # controlled actors most likely want to do something
+          if self.controller and self.last_control + self.control_interval > self.world.get_time():
+            self.controller.update()
+            self.last_control = self.world.get_time()
+      
+      def draw(self, screen, draw_debug = False):
+          """
+          Draw the image on screen, called in sequence from main game loop for each actor
+          """
+          Drawable.draw(self, screen, draw_debug)
+
+          # draw hp bar (if there is one)
+          if self.initial_hp:
+            x, y      = self.get_xy()
+            hp_color  = (64, 255, 64)
+            hp_border = (x - 15, y, 30, 3)
+            hp_fill   = (x - 15, y, 30 * (self.hp / self.initial_hp), 3)
+            pygame.draw.rect(screen, hp_color, hp_border, 1)
+            pygame.draw.rect(screen, hp_color, hp_fill, 0)
+
 class MagicCaster:
       """
       Supplements an Actor
 
       Handles the list of magic particles controlled by an actor
       Manages how the actor influences the particles
+      Manages the actor's magic energy budget (never overuse)
       """
       magic_distance = 5.0
 
@@ -71,7 +410,7 @@ class MagicCaster:
           return self.actor.magic_energy
       def balance_energy(self):
           """
-          go over the list of affects and make sure we stay within
+          go over the list of affected particles and make sure we stay within
           the energy consumption limit
           """
           used = 0.0
@@ -87,7 +426,6 @@ class MagicCaster:
             corrected = 0.0
             for speed, power in self.affects.values():
               corrected += abs(speed) + abs(power)
-            #print "used=%.1f > total=%.1f -> ratio=%.2f: corrected=%.1f" % (used, self.energy(), ratio, corrected)
 
       # called by particles
       def affect_particle(self, particle):
@@ -96,303 +434,24 @@ class MagicCaster:
           if self.affects.has_key(particle):
             del self.affects[particle]
 
-class Actor:
-      # movement
-      const_speed = 0.0
-      const_accel = 0.0
-      feel_magic  = True
-
-      # animation conf
-      animate_stop = False
-      anim_speed   = 1.0
-      directed     = True
-      # order of drawing
-      stacking     = 0
-      # divisor for position calculation
-      distance     = 1.0
-
-      # vertical
-      hover_height = 0.0
-      base_height  = 0.0
-      from_ceiling = False
-
-      # sounds
-      snd_move     = []
-      snd_death    = []
-
-      # char attributes
-      initial_hp     = 100.0
-      regeneration   = 0.5
-      initial_energy = 10.0
-      
-      # "puppetmaster"
-      control        = None
-
-      # if draw_debug has any effect
-      in_dev_mode    = False
-
-      def __init__(self, world, pos):
-          self.world  = world
-          # movement params
-          self.pos    = pos
-          self.speed  = 0.0
-          self.accel  = 0.0
-          # mostly unused
-          self.ypos   = 0.0
-          self.yspeed = 0.0
-          self.yaccel = 0.0
-
-          # fields
-          self.LightField = self.world.get_field(fields.LightField)
-          self.EnergyField = self.world.get_field(fields.EnergyField)
-          self.EarthField = self.world.get_field(fields.EarthField)
-
-          # actor clock
-          self.last_update = world.get_time()
-          self.timediff    = 0.0
-
-          # animation params
-          self.start_time = time.time()
-          self.rnd_time_offset = random() * 25.0
-          self.direction  = -1
-          self.animate    = self.animate_stop
-          self.next_sound = 0.0
-
-          # character params
-          self.hp           = self.initial_hp
-          self.magic_energy = self.initial_energy
-          self.magic        = MagicCaster(self)
-          self.dead         = False
-
-          # load images
-          if len(self.sprite_names):
-            if self.directed:
-              self.img_left  = world.loader.get_spritelist(self.sprite_names[0])
-              self.img_right = world.loader.get_spritelist(self.sprite_names[1])
-              self.img_count = len(self.img_left)
-              self.img_w     = self.img_left[0].get_width()
-              self.img_h     = self.img_left[0].get_height()
-            else:
-              self.img_list  = world.loader.get_spritelist(self.sprite_names[0])
-              self.img_count = len(self.img_list)
-              self.img_w     = self.img_list[0].get_width()
-              self.img_h     = self.img_list[0].get_height()
-            self.cur_img_idx = 0
-          else:
-            self.img_w = 100
-            self.img_h = 100
-
-          # controller init
-          if self.control:
-            self.controller = self.control(self)
-          else:
-            self.controller = None
-      def destroy(self):
-          self.world.del_actor(self)
-          self.magic.release_all()
-
-      def __str__(self):
-          return "%s(0x%s)" % (str(self.__class__).split(".")[1], id(self))
-      def debug_info(self):
-          desc = "%s pos=%.1f speed=%.3f" % (str(self), self.pos, self.speed)
-          if self.controller:
-            desc += "\nController: %s" % (self.controller.debug_info())
-          return desc
-
-      # play sounds
-      def in_range(self):
-          return self.pos > self.world.view.pl_x1() and self.pos < self.world.view.pl_x2()
-      def movement_sound(self):
-          if self.snd_move and self.in_range() and self.next_sound < self.world.get_time():
-            self.next_sound = self.world.get_time() + 1.0 + random()
-            count = len(self.snd_move)
-            sound = self.snd_move[int(random() * count)]
-            self.world.loader.play_sound(sound)
-      def death_sound(self):
-          if self.snd_death and self.in_range():
-            count = len(self.snd_death)
-            sound = self.snd_death[int(random() * count)]
-            self.world.loader.play_sound(sound)
-
-      # moving the actor
-      def move_left(self):
-          if not self.const_accel:
-            self.speed   = -self.const_speed
-          else:
-            self.accel   = -self.const_accel
-          self.animate   = True
-          self.direction = -1
-          self.movement_sound()
-      def move_right(self):
-          if not self.const_accel:
-            self.speed   = self.const_speed
-          else:
-            self.accel   = self.const_accel
-          self.animate   = True
-          self.direction = 1
-          self.movement_sound()
-      def stop(self):
-          if not self.const_accel:
-            self.speed   = 0
-          else:
-            self.accel   = 0
-          self.animate   = self.animate_stop
-
-      # called every frame
-      def update(self):
-          # update actor clock
-          now              = self.world.get_time()
-          self.timediff    = now - self.last_update
-          self.last_update = now
-
-          # update movement
-          if self.const_speed or self.const_accel:
-            # normal movement
-            self.speed  += self.timediff * self.accel
-            self.yspeed += self.timediff * self.yaccel
-            # magical movement
-            if self.feel_magic:
-              magic_speed = self.EnergyField.value(self.pos) * 10.0
-              magic_mult  = self.LightField.value(self.pos)
-              if magic_mult > 0:
-                magic_mult *= 5.0
-              else:
-                magic_mult *= 1.0
-              magic_mult   += 1.0
-            else:
-              magic_speed = 0.0
-              magic_mult  = 1.0
-            # update position
-            self.pos   += magic_mult * self.timediff * (self.speed + magic_speed)
-            self.ypos  += magic_mult * self.timediff * self.yspeed
-            if self.animate:
-              self.movement_sound()
-
-          # update hp
-          if self.initial_hp:
-            light_damage  = abs(self.LightField.value(self.pos))    * 10.0
-            energy_damage = abs(self.EnergyField.value(self.pos))   * 10.0
-            earth_damage  = max(self.EarthField.value(self.pos), 0) * 25.0
-            self.hp -= self.timediff * (light_damage + energy_damage + earth_damage)
-            if self.hp < self.initial_hp:
-              magic_regen = max(-self.EarthField.value(self.pos), 0) * 12.5
-              self.hp += self.timediff * (self.regeneration + magic_regen)
-            if self.hp > self.initial_hp:
-              self.hp = self.initial_hp
-            # death
-            if self.hp <= 0 and self.initial_hp:
-              self.dead = True
-              self.death_sound()
-              self.destroy()
-
-          # set magic energy
-          if self.initial_energy:
-            magic_mult = self.EarthField.value(self.pos) / 2.0 + 1.0
-            self.magic_energy = magic_mult * self.initial_energy
-          
-          # controlled actors
-          if self.controller:
-            self.controller.update()
-      
-      # draw image, either left-right directed or unidirectional
-      def draw(self, screen, draw_debug = False, draw_hp = False):
-          view = self.world.view
-
-          x = view.pl2sc_x(self.pos) / self.distance
-          # do not draw off-the screen actors
-          if x + self.img_w / 2 < 0 or x - self.img_w / 2 > view.sc_w():
-            return
-
-          # hovering in air (slightly wobbling up and down)
-          if self.hover_height:
-            hover = self.hover_height + self.hover_height * \
-                    math.sin((time.time() + self.rnd_time_offset - self.start_time) * 2) * 0.3
-          else:
-            hover = 0.0
-          y = view.pl2sc_y(self.ypos) / self.distance + hover + self.base_height
-          if not self.from_ceiling:
-            y = view.sc_h() - self.img_h - y
-
-          # draw debugging information
-          if draw_debug and self.in_dev_mode:
-            lines = self.debug_info().split("\n")
-            txts  = []
-            for line in lines:
-              txts.append(self.world.loader.debugfont.render(line, True, (255, 255, 255)))
-            i = 0
-            for txt in txts:
-              screen.blit(txt, (x, int(draw_debug) + 20 + i * 20))
-              i += 1
-
-          # do not draw/animate spriteless actors
-          if len(self.sprite_names) == 0:
-            return
-
-          # facing direction
-          if self.directed:
-            if self.direction > 0:
-              imglist = self.img_right
-            else:
-              imglist = self.img_left
-          # unidirectional
-          else:
-            imglist = self.img_list
-
-          # to animate or not to animate
-          if self.animate:
-            self.cur_img_idx = int(time.time() * self.img_count * self.anim_speed) % self.img_count
-          else:
-            self.cur_img_idx = 0
-
-          # actual drawing
-          img = imglist[self.cur_img_idx]
-          screen.blit(img, (x - self.img_w / 2, y))
-
-          # draw hp bar (if there is one)
-          if draw_hp and self.initial_hp:
-            hp_color   = (64, 255, 64)
-            hp_border  = (x - 15, y, 30, 3)
-            hp_fill    = (x - 15, y, 30 * (self.hp / self.initial_hp), 3)
-            pygame.draw.rect(screen, hp_color, hp_border, 1)
-            pygame.draw.rect(screen, hp_color, hp_fill, 0)
-
 import fields
 
 ## stacking rules:
-# static sky background   - 0-4
-# moving sky background   - 5-9
-# on-ground background    - 10-14
-# on-ground level objects - 15-19
-# NPCs                    - 20-24
-# player                  - 25
-# magicparticles          - 26+
+# sky background - 0-4
+# background     - 5-9
+# scenery        - 10-14
+# level objects  - 15-19
+# NPCs           - 20-24
+# player         - 25
+# magicparticles - 26
+# foreground objects - 27+
 
 # scenery
-class Scenery(Actor):
-      feel_magic     = False
-      initial_hp     = 0
-      initial_energy = 0
-      directed       = False
+class Scenery(Drawable):
+      pass
 class Tree(Scenery):
       sprite_names = ["tree"]
       stacking     = 10
-class Sun(Scenery):
-      sprite_names = ["sun"]
-      from_ceiling = True
-      base_height  = 50
-      stacking     = 0
-      distance     = 5.0
-class Cloud(Scenery):
-      sprite_names = ["cloud"]
-      from_ceiling = True
-      base_height  = 150
-      hover_height = 25
-      stacking     = 6
-      const_speed  = 1.0
-      distance     = 5.0
-      def update(self):
-          # TODO: slow flying around
-          Actor.update(self)
 class Post(Scenery):
       sprite_names = ["post"]
       animate_stop = True
@@ -401,22 +460,59 @@ class Hut(Scenery):
       sprite_names = ["hut"]
       stacking     = 15
 
-# swarming demo
-class Bird(Scenery):
-      animate_stop = True
-      directed     = True
+class Sky(Drawable):
+      from_ceiling = True
+class Sun(Sky):
+      distance     = 4.0
+      sprite_names = ["sun"]
+      base_height  = 50
+      stacking     = 0
+class Cloud(Sky):
+      distance     = 3.0
+      sprite_names = ["cloud"]
+      base_height  = 150
+      hover_height = 5
       stacking     = 5
+      def update(self):
+          # TODO: slowly flying around
+          pass
+
+## background images
+class Background(Drawable):
+      distance = 3.0
+      stacking = 2
+
+      def draw(self, screen, draw_debug = False): 
+          img    = self.img_list[0]
+          bg_w   = img.get_width() 
+          bg_h   = img.get_height()
+          view   = self.world.view
+          offset = (view.pl2sc_x(0) / self.distance) % bg_w - bg_w 
+          count  = int(view.sc_w() / bg_w) + 2 
+          for i in xrange(count):
+            screen.blit(img, (offset + i * bg_w, view.sc_h() - bg_h))
+
+class BackgroundHills(Background):
+      sprite_names = ["hills"]
+
+# swarming demo
+class Bird(Actor):
+      animate_stop = True
+      stacking     = 3
       base_height  = 0
       from_ceiling = True
       distance     = 3.0
+
+      feel_magic   = False
+      initial_hp   = 0
 class SmallBird(Bird):
       sprite_names = ["smallbird-left", "smallbird-right"]
-      const_speed  = 2.5
-      const_accel  = 12.5
+      const_speed  = 5
+      const_accel  = 25
 class BigBird(Bird):
       sprite_names = ["bigbird-left", "bigbird-right"]
-      const_speed  = 5.0
-      const_accel  = 5.0
+      const_speed  = 10
+      const_accel  = 15
 
 # Characters
 class Character(Actor):
@@ -527,6 +623,8 @@ class BirdFlocker(FlyingController):
           self.group_size   = 20.0
           self.visible_dist = 30.0
           # random flying around points
+          self.ypos_upper_bound = 90.0
+          self.pos_max_spread   = 1000
           self.random_waypoint()
 
       def debug_info(self):
@@ -534,8 +632,8 @@ class BirdFlocker(FlyingController):
                  (FlyingController.debug_info(self), self.xwaypoint, self.ywaypoint)
 
       def random_waypoint(self):
-          self.xwaypoint = random() * 200 - 100
-          self.ywaypoint = random() * 25
+          self.xwaypoint = random() * self.pos_max_spread - (self.pos_max_spread / 2)
+          self.ywaypoint = random() * self.ypos_upper_bound
 
       def find_offset(self):
           # calculate destination, prefer waypoint
@@ -545,7 +643,7 @@ class BirdFlocker(FlyingController):
           self.xdiff, self.ydiff = x, y
 
           # bounds
-          if self.puppet.ypos > 30.0:
+          if self.puppet.ypos > self.ypos_upper_bound:
             self.ydiff -= self.weight_bounds
 
           # predators
