@@ -3,9 +3,9 @@ Stuff to do, in order:
   * run, get help, get back, fight, secure position
   * focus on: big battle, speed
  * controls improvement
-  * review tapping 'w' and 's'
   * implement mouse control (for balls)
  * further camera improvements - less switching during turing
+  * not so jumpy
   * delayed speed estimation?
   * following actor + controlled ball(s)?
  * sound effects
