@@ -12,7 +12,6 @@ class MagicField:
       basevalue  = 0.0
 
       def __init__(self, loader):
-          self.visibility = False
           self.particles  = []
           self.loader  = loader
 
@@ -38,58 +37,47 @@ class MagicField:
               v += 1 / (dev * math.sqrt(2 * math.pi)) * math.exp((-(pos - mean) ** 2)/(2 * dev ** 2)) * mult
           return v
 
-      # draw the field on screen
-      def toggle_visibility(self, set = None):
-          if set == None:
-            self.visibility = not self.visibility
-          else:
-            self.visibility = set
       # Get the field's value at pos as translated through the view
       def sc_value(self, view, pos):
-          return pos, view.sc_h() - (self.value(view.sc2pl_x(pos)) + 1.0) * view.sc_h() / 2.0
+          value = self.value(view.sc2pl_x(pos))
+          return pos, view.sc_h() - (value + 1.0) * view.sc_h() / 2.0, value
       def draw(self, view, screen, draw_debug = False):
-          if self.visibility:
-            # step should be float to cover the whole range
-            step = float(screen.get_width()) / float(self.drawpoints)
-            # first point
-            this = self.sc_value(view, 0.0)
-            for pos in xrange(self.drawpoints):
-              # at the next position
-              next = self.sc_value(view, (pos + 1) * step)
+          # step should be float to cover the whole range
+          step = float(view.sc_w()) / float(self.drawpoints)
+          for i in xrange(self.drawpoints):
+            pos   = i * step
+            value = self.value(view.sc2pl_x(pos))
+            ypos  = view.sc_h() - (value + 1.0) * view.sc_h() / 2.0
+            # draw
+            if abs(value) > 0.01:
               # color of the line segment
-              if this > 0.0: color = self.poscolor
-              else: color = self.negcolor
-              # draw
-              pygame.draw.line(screen, color, this, next, 3)
-              if draw_debug:
-                if pos % (self.drawpoints / 5) == 0:
-                  at  = view.sc2pl_x(pos * step)
-                  val = self.value(at)
-                  txt = "%s.value(%.2f:%.2f) = %.2f" % (str(self.__class__).split(".")[1], pos, at, val)
-                  txt = self.loader.debugfont.render(txt, True, (255, 255, 255))
-                  screen.blit(txt, this)
-              # move on
-              this = next
+              alpha = min(192, abs(value) * 256 * 8)
+              color = self.color + (alpha,)
+              s = effects.get_circle(color, min(3, abs(value) * 100, screen))
+              screen.blit(s, (pos, ypos))
+              if draw_debug and i % (self.drawpoints / 5) == 0:
+                at  = view.sc2pl_x(pos)
+                val = self.value(at)
+                txt = "%s.value(%.2f:%.2f) = %.2f" % (str(self.__class__).split(".")[1], i, at, value)
+                txt = self.loader.debugfont.render(txt, True, (255, 255, 255))
+                screen.blit(txt, (pos, ypos))
 
 # Light
 # affects: speed < health regen? > vision
 # TODO: vision effects
 class LightField(MagicField):
       basevalue = 0.0
-      poscolor  = (192, 192, 255)
-      negcolor  = (64, 64, 0)
+      color  = (192, 192, 255)
 
 # Energy
 # affects: right < health regen? > left
 class EnergyField(MagicField):
-      poscolor = (255, 255, 128)
-      negcolor = (0, 0, 128)
+      color = (255, 255, 128)
 
 # Earth
 # affects: energy regen <-> health regen
 class EarthField(MagicField):
-      poscolor = (192, 64, 192)
-      negcolor = (64, 192, 64)
+      color = (192, 64, 192)
 
 all = [ LightField,
         EnergyField,
@@ -203,17 +191,26 @@ class MagicParticle(actors.Actor):
           actors.Actor.draw(self, screen, draw_debug, draw_hp)
           # draw magic "ball"
           radius = 25
-          s = pygame.surface.Surface((radius * 2, radius * 2), pygame.SRCALPHA, 32)
-          pygame.draw.circle(s, (255, 255, 255, 32), (radius, radius), radius, 0)
-          screen.blit(s, (self.world.view.pl2sc_x(self.pos) - radius, self.world.view.sc_h() - self.hover_height - radius))
-          if self.selected:
-            radius = 50
-            s = pygame.surface.Surface((radius * 2, radius * 2), pygame.SRCALPHA, 32)
-            pygame.draw.circle(s, (255, 255, 255, 16), (radius, radius), radius, 0)
-            screen.blit(s, (self.world.view.pl2sc_x(self.pos) - radius, self.world.view.sc_h() - self.hover_height - radius))
+          x      = self.world.view.pl2sc_x(self.pos)
+          y      = self.world.view.sc_h() - self.hover_height
+          s = effects.get_circle((255, 255, 255, 32), radius, screen)
+          screen.blit(s, (x - radius, y - radius))
+
           # draw field effects
           for fx in self.particle_effects:
             fx.draw(screen, draw_debug)
+            
+          # if it's selected
+          if self.selected:
+            radius = 50
+            s = effects.get_circle((255, 255, 255, 16), radius, screen)
+            screen.blit(s, (x - radius, y - radius))
+            # affects
+            s = effects.get_circle((255, 255, 255, 64), 5, screen)
+            for caster in self.affects:
+              accel, mult = caster.affect_particle(self)
+              screen.blit(s, (x - 5 + accel * 3.0, y - 5 - mult * 3.0))
+
 
 
 class LightBall(MagicParticle):

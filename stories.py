@@ -213,7 +213,6 @@ class Shepherd(Story):
               ))
 
           elif self.state == "begin":
-            self.set_state("learn_energy")
             self.batch_narrate((
               (4.0, "My rabbits have gone wandering!"),
               (4.0, "They are supposed to stay between these two posts."),
@@ -221,26 +220,21 @@ class Shepherd(Story):
               (2.0, "Well, we'll see about that!"),
               (2.0, "I've got some tricks up my sleeve..."),
               (2.0, "Energy magic is going to help me out!"),
-              (0.0, "Now, how did that work exactly..."),
+              (2.0, "Now, how did that work exactly..."),
               (2.0, "Right!"),
-              (3.0, "First we need to look at the Energy Magic Field [press 'x'].", 10.0),
-              (5.0, "And then cast an Energy Magic Ball [hold shift, press 'X'].", 10.0),
+              (5.0, "I should cast an Energy Magic Ball [press 'x'].", 10.0),
               ))
 
-            field_visible = self.world.get_field(fields.EnergyField).visibility
-            ballcast      = False
+            ballcast = False
             for particle in self.dude.magic.affects.keys():
               if isinstance(particle, fields.EnergyBall):
                 ballcast = True
                 break
-            if field_visible and ballcast:
+            if ballcast:
               self.set_state("particle_control")
 
-            if self.narrated() and self.time_passed(15):
-              if not field_visible:
-                self.narrate("I need to see the Energy Magic Field [press 'x'].", duration = 10.0)
-              if not ballcast:
-                self.narrate("I need to cast an Energy Magic Ball [hold shift, press 'X'].", duration = 10.0)
+            if self.narrated() and self.time_passed(15) and not ballcast:
+              self.narrate("I need to cast an Energy Magic Ball [press 'x'].", duration = 10.0)
 
           elif self.state == "particle_control":
             self.batch_narrate((
@@ -288,7 +282,7 @@ class Shepherd(Story):
             
             if self.narrated() and self.time_passed(15):
               if not ballcast:
-                self.narrate("I need to have an Energy Magic Ball [hold shift, press 'X'].", duration = 10.0)
+                self.narrate("I need to have an Energy Magic Ball [press 'x'].", duration = 10.0)
               if not negative:
                 self.narrate("The Energy Magic Ball needs to have a negative energy ['s' key].", duration = 10.0)
               if not close:
@@ -316,7 +310,7 @@ class Shepherd(Story):
             self.batch_narrate((
               (0.0, "...13, 14, 15!"),
               (2.0, "That's the last one!"),
-              (6.0, "So, if I can make an Energy Magic Ball [hold shift, press 'X']..."),
+              (6.0, "So, if I can make an Energy Magic Ball [press 'x']..."),
               (2.0, "I can change the speed and direction of the wind ['w' and 's' keys]..."),
               (2.0, "And move it close to my rabbits ['a' and 'd' keys]..."),
               (3.0, "I should have them gathered between the posts in no time!"),
@@ -324,12 +318,12 @@ class Shepherd(Story):
               ))
 
             if self.narrated() and self.time_passed(30):
-              self.narrate("I should use an Energy Magic Ball [hold shift, press 'X']...", duration = 10.0)
+              self.narrate("I should use an Energy Magic Ball [press 'x']...", duration = 10.0)
               self.narrate("...change it's wind direction ['w' and 's' keys]...", duration = 10.0)
               self.narrate("...and move it close to rabbits ['a' and 'd' keys]...", duration = 10.0)
               self.narrate("...to guide them between the posts [to the right].", duration = 10.0)
 
-class Salvation(Story):
+class Massacre(Story):
       def __init__(self, *args):
           Story.__init__(self, *args)
 
@@ -344,12 +338,12 @@ class Salvation(Story):
           world.new_actor(actors.HuntingDragon, 75)
           world.new_actor(actors.HuntingDragon, 80)
           for dragon in world.get_actors(include = [actors.Dragon]):
-            dragon.controller.set_waypoint(50.0)
+            dragon.controller.set_waypoint(75.0)
 
           # sweet rabbits to protect
           for i in xrange(25):
             rabbit = world.new_actor(actors.ScaredRabbit, 0 + 100 * random())
-            rabbit.controller.set_waypoint(25.0)
+            rabbit.controller.set_waypoint(50.0)
 
           # player-controlled object
           self.dude = world.new_actor(actors.Dude, 10)
@@ -416,26 +410,20 @@ class Salvation(Story):
               (6.0, "Those dragons can be pretty dangerous."),
               (2.0, "They were using Earth Magic to kill my poor rabbits."),
               (2.0, "To fight them, I must also use Earth Magic."),
-              (4.0, "Take a look at the Earth Magic Field [press 'c']."),
-              (4.0, "And cast an Earth Magic Ball [hold shift, press 'C']."),
+              (4.0, "I should cast an Earth Magic Ball [press 'c']."),
               ))
 
-            field_visible = self.world.get_field(fields.EarthField).visibility
-            ballcast      = False
+            ballcast = False
             for particle in self.dude.magic.affects.keys():
               if isinstance(particle, fields.EarthBall):
                 ballcast = True
-            if field_visible and ballcast:
+            if ballcast:
               self.set_state("particle_control")
             if self.narrated() and self.time_passed(15):
-              if field_visible:
-                self.narrate("Good, the effects of you Earth Magic Balls can be seen on the field.")
-              else:
-                self.narrate("Take a look at the Earth Magic Field [press 'c'].", duration = 10.0)
               if ballcast:
                 self.narrate("Good, you have cast an Earth Magic Ball for practice.")
               else:
-                self.narrate("And also cast an Earth Magic Ball [hold shift, press 'C'].", duration = 10.0)
+                self.narrate("And also cast an Earth Magic Ball [press 'c'].", duration = 10.0)
 
           elif self.state == "particle_control":
             self.batch_narrate((
@@ -448,7 +436,7 @@ class Salvation(Story):
 
             if self.narrated() and self.time_passed(30):
               self.batch_narrate((
-                (0.0, "Try to make an Earth magic ball [hold shift, press 'C'].", 15.0),
+                (0.0, "Try to make an Earth magic ball [press 'c'].", 15.0),
                 (5.0, "Make it's power negative ['s' key].", 15.0),
                 (5.0, "And move it close to yourself ['a' and 'd' keys].", 15.0)
                 ), "instructions")
@@ -483,7 +471,7 @@ class Salvation(Story):
             self.batch_narrate((
               (0.0, "Wait!"),
               (2.0, "A few last words of before we fight..."),
-              (4.0, "Aside from making the magic balls yourself, I can also capture them."),
+              (4.0, "Aside from making the magic balls myself, I can also capture them."),
               (4.0, "For example those, that the dragons throw at me [hold ctrl, press 'd'].", 10.0),
               (5.0, "But it works on all magic balls [hold ctrl, press 'a' or 'd' key or a number].", 10.0),
               (5.0, "Try to catch one of the dragons' magic balls!"),
@@ -501,7 +489,7 @@ class Salvation(Story):
               (2.0, "Now use it to slay the dragon!"),
               ))
 
-            if self.narrate() and state_time % 15 < 1.0:
+            if self.narrated() and state_time % 15 < 1.0:
               rabbits = len(self.world.get_actors(include = [ actors.Rabbit ]))
               self.narrate("Slay the dragons! There are still %u rabbits left to save!" % (rabbits))
 
@@ -581,9 +569,6 @@ class Siege(Story):
           world = self.world
           self.default_scenery()
 
-          # extra scenery
-          world.new_actor(actors.Hut, 300)
-
           # enemies
           for i in xrange(5):
             dragon = world.new_actor(actors.HuntingDragon, random() * 50.0)
@@ -593,6 +578,12 @@ class Siege(Story):
           for i in xrange(4):
             dude = world.new_actor(actors.HuntingDude,  100 - random() * 50.0)
             dude.controller.set_waypoint(0)
+
+          # the guardmaster
+          world.new_actor(actors.Hut, 300)
+          self.guardmaster = world.new_actor(actors.Dude, 310)
+          world.new_actor(actors.Guardian, 315)
+          world.new_actor(actors.Guardian, 320)
 
           # player-controlled object
           self.dude = world.new_actor(actors.Dude, -100)

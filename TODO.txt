@@ -1,15 +1,26 @@
 Stuff to do, in order:
+ * finish Siege story
+  * run, get help, get back, fight, secure position
+  * focus on: big battle, speed
+ * controls improvement
+  * review tapping 'w' and 's'
+  * implement mouse control (for balls)
+ * further camera improvements - less switching during turing
+  * delayed speed estimation?
+  * following actor + controlled ball(s)?
  * sound effects
   * creature sounds
    * should not be so lowsy
   * each field/ball has a sound effect
+ * implement "visual" magic
 
 Ideas:
- * ball actions
+ * balls
   * merge/split - when low tension, forces not opposing
   * release/acquire - always
   * movement/shape - always
    * not just the normal distribution
+  * combinations of different fields
  * field effects
   * force vs speed?
    * speed - time multiplier
@@ -23,7 +34,6 @@ Ideas:
    * health
    * movement
    * energy
- * no ball pictures, each field draws their own effects?
  * language
   * magic can be written in a language, spells written and read
   * magic casters (NPCs) can be scripted

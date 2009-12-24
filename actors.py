@@ -106,7 +106,10 @@ class Actor:
       animate_stop = False
       anim_speed   = 1.0
       directed     = True
+      # order of drawing
       stacking     = 0
+      # divisor for position calculation
+      distance     = 1.0
 
       # vertical
       hover_height = 0.0
@@ -294,9 +297,21 @@ class Actor:
       # draw image, either left-right directed or unidirectional
       def draw(self, screen, draw_debug = False, draw_hp = False):
           view = self.world.view
+
+          x = view.pl2sc_x(self.pos) / self.distance
           # do not draw off-the screen actors
-          if self.pos + self.img_w < view.pl_x1() or self.pos - self.img_w > view.pl_x2():
+          if x + self.img_w / 2 < 0 or x - self.img_w / 2 > view.sc_w():
             return
+
+          # hovering in air (slightly wobbling up and down)
+          if self.hover_height:
+            hover = self.hover_height + self.hover_height * \
+                    math.sin((time.time() + self.rnd_time_offset - self.start_time) * 2) * 0.3
+          else:
+            hover = 0.0
+          y = view.pl2sc_y(self.ypos) / self.distance + hover + self.base_height
+          if not self.from_ceiling:
+            y = view.sc_h() - self.img_h - y
 
           # draw debugging information
           if draw_debug and self.in_dev_mode:
@@ -306,7 +321,7 @@ class Actor:
               txts.append(self.world.loader.debugfont.render(line, True, (255, 255, 255)))
             i = 0
             for txt in txts:
-              screen.blit(txt, (view.pl2sc_x(self.pos) - self.img_w / 2, int(draw_debug) + 20 + i * 20))
+              screen.blit(txt, (x, int(draw_debug) + 20 + i * 20))
               i += 1
 
           # do not draw/animate spriteless actors
@@ -329,26 +344,15 @@ class Actor:
           else:
             self.cur_img_idx = 0
 
-          # hovering in air (slightly wobbling up and down)
-          if self.hover_height:
-            hover = self.hover_height + self.hover_height * \
-                    math.sin((time.time() + self.rnd_time_offset - self.start_time) * 2) * 0.3
-          else:
-            hover = 0.0
-
           # actual drawing
           img = imglist[self.cur_img_idx]
-          x   = view.pl2sc_x(self.pos)  - self.img_w / 2
-          y   = view.pl2sc_y(self.ypos) + hover + self.base_height
-          if not self.from_ceiling:
-            y = view.sc_h() - self.img_h - y
-          screen.blit(img, (x, y))
+          screen.blit(img, (x - self.img_w / 2, y))
 
           # draw hp bar (if there is one)
           if draw_hp and self.initial_hp:
             hp_color   = (64, 255, 64)
-            hp_border  = (view.pl2sc_x(self.pos), view.sc_h() - self.img_h - hover, 30, 3)
-            hp_fill    = (view.pl2sc_x(self.pos), view.sc_h() - self.img_h - hover, 30 * (self.hp / self.initial_hp), 3)
+            hp_border  = (x - 15, y, 30, 3)
+            hp_fill    = (x - 15, y, 30 * (self.hp / self.initial_hp), 3)
             pygame.draw.rect(screen, hp_color, hp_border, 1)
             pygame.draw.rect(screen, hp_color, hp_fill, 0)
 
@@ -377,6 +381,7 @@ class Sun(Scenery):
       from_ceiling = True
       base_height  = 50
       stacking     = 0
+      distance     = 5.0
 class Cloud(Scenery):
       sprite_names = ["cloud"]
       from_ceiling = True
@@ -384,6 +389,7 @@ class Cloud(Scenery):
       hover_height = 25
       stacking     = 6
       const_speed  = 1.0
+      distance     = 5.0
       def update(self):
           # TODO: slow flying around
           Actor.update(self)
@@ -402,6 +408,7 @@ class Bird(Scenery):
       stacking     = 5
       base_height  = 0
       from_ceiling = True
+      distance     = 3.0
 class SmallBird(Bird):
       sprite_names = ["smallbird-left", "smallbird-right"]
       const_speed  = 2.5
@@ -444,7 +451,7 @@ class Guardian(Character):
       const_speed    = 0.5
       initial_hp     = 250
       regeneration   = 2.0
-      initial_energy = 20.0
+      initial_energy = 30.0
       sprite_names = ["guardian-left", "guardian-right"]
 
 # controllers
@@ -695,28 +702,32 @@ class GuardianController(FSMController):
             if not self.shot or self.shot.dead:
               self.shot = self.puppet.magic.new(fields.LightBall)
 
-            # shot position
             if self.target.pos < self.puppet.pos:
               dest_pos = self.puppet.pos - 20.0
             else:
               dest_pos = self.puppet.pos + 20.0
+            dest_value = -1.0
 
+            # shot position
             offset = abs(self.shot.pos - dest_pos)
             if offset > 1.0:
-              self.puppet.magic.power(self.shot, 0.0)
+              if offset > 3.0:
+                self.puppet.magic.power(self.shot, 0.0)
+              c = min(1.0, abs(self.shot.pos + self.shot.speed - dest_pos) / 3.0)
               if self.shot.pos + self.shot.speed > dest_pos:
-                self.puppet.magic.move(self.shot, -self.puppet.magic_energy)
+                self.puppet.magic.move(self.shot, -c * self.puppet.magic_energy)
               elif self.shot.pos + self.shot.speed < dest_pos:
-                self.puppet.magic.move(self.shot, self.puppet.magic_energy)
+                self.puppet.magic.move(self.shot,  c * self.puppet.magic_energy)
 
             # Field value
             if offset < 3.0:
-              value      = self.puppet.LightField.value(self.shot.pos)
-              dest_value = -1.0
+              value = self.puppet.LightField.value(self.shot.pos)
+              diff  = dest_value - value
+              c = min(1.0, abs(diff) / 0.05)
               if value < dest_value:
-                self.puppet.magic.power(self.shot, self.puppet.magic_energy)
+                self.puppet.magic.power(self.shot,  c * self.puppet.magic_energy)
               elif value > dest_value:
-                self.puppet.magic.power(self.shot, -self.puppet.magic_energy)
+                self.puppet.magic.power(self.shot, -c * self.puppet.magic_energy)
 
 class WimpyController(FSMController):
       states   = [ "idle", "flee" ]

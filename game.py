@@ -336,6 +336,7 @@ class Game:
           pygame.init()
           pygame.mixer.init()
           pygame.display.set_caption(self.gamename)
+          pygame.key.set_repeat(300, 150)
           self.clock  = pygame.time.Clock()
 
           # screen params
@@ -372,7 +373,7 @@ class Game:
 
           menu = [
                   { "id":  "shepherd", "txt": "Gentle Shepherd" },
-                  { "id":  "salvation", "txt": "Rabbits` Salvation" },
+                  { "id":  "massacre", "txt": "Fiery Massacre" },
                   { "id":  "blockade", "txt": "Guardian Blockade" },
                   { "id":  "siege", "txt": "Under Siege" },
                   { "id":  "exit", "txt": "Exit Game" },
@@ -423,9 +424,9 @@ class Game:
                   elif action == "shepherd":
                     self.set_music("happytheme")
                     self.run_story(stories.Shepherd)
-                  elif action == "salvation":
+                  elif action == "massacre":
                     self.set_music("warmarch2")
-                    self.run_story(stories.Salvation)
+                    self.run_story(stories.Massacre)
                   elif action == "blockade":
                     self.set_music("warmarch2")
                     self.run_story(stories.Blockade)
@@ -480,7 +481,6 @@ class Game:
 
           # input states
           get_magic  = False
-          cast_magic = False
           sel_magic  = False
 
           while forever:
@@ -570,8 +570,8 @@ class Game:
               i = 1
               local_balls = world.get_actors(player.pos - 100, player.pos + 100, include = [ fields.MagicParticle ])
               for ball in local_balls:
-                ball_txt = world.loader.textfont.render("%u: %s" % (i, str(ball.__class__).split(".")[1]), True, ball.field.poscolor)
-                ball_nr  = world.loader.textfont.render("%u" % (i), True, ball.field.poscolor)
+                ball_txt = world.loader.textfont.render("%u: %s" % (i, str(ball.__class__).split(".")[1]), True, ball.field.color)
+                ball_nr  = world.loader.textfont.render("%u" % (i), True, ball.field.color)
                 screen.blit(ball_txt, (10, 40 + i * 20))
                 screen.blit(ball_nr, (view.pl2sc_x(ball.pos), view.sc_h() - 80))
                 i += 1
@@ -615,38 +615,25 @@ class Game:
                 elif event.key == pygame.K_TAB:
                   #draw_hp    = not draw_hp
                   draw_debug = not draw_debug
-                elif event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
-                  cast_magic = True
-                  if sel_magic:
-                    sel_magic.selected = False
-                    sel_magic  = False
                 elif event.key == pygame.K_LCTRL or event.key == pygame.K_RCTRL:
                   get_magic  = True
                   if sel_magic:
                     sel_magic.selected = False
                     sel_magic  = False
                 
-                # cast_magic & fields
-                elif cast_magic and event.key == pygame.K_z:
+                # cast magic balls
+                elif event.key == pygame.K_z:
                   sel_magic = player.magic.new(fields.LightBall)
                   sel_magic.selected = True
                   casting = False
-                elif cast_magic and event.key == pygame.K_x:
+                elif event.key == pygame.K_x:
                   sel_magic = player.magic.new(fields.EnergyBall)
                   sel_magic.selected = True
                   casting = False
-                elif cast_magic and event.key == pygame.K_c:
+                elif event.key == pygame.K_c:
                   sel_magic = player.magic.new(fields.EarthBall)
                   sel_magic.selected = True
                   casting = False
-
-                # toggle magic fields
-                elif event.key == pygame.K_z:
-                  world.get_field(fields.LightField).toggle_visibility()
-                elif event.key == pygame.K_x:
-                  world.get_field(fields.EnergyField).toggle_visibility()
-                elif event.key == pygame.K_c:
-                  world.get_field(fields.EarthField).toggle_visibility()
 
                 # recapture existing particles
                 elif get_magic and event.key >= pygame.K_1 and event.key <= pygame.K_9:
@@ -657,7 +644,7 @@ class Game:
                     sel_magic = local_balls[idx]
                     sel_magic.selected = True
                     player.magic.capture(sel_magic)
-                elif get_magic and not cast_magic and (event.key == pygame.K_a or event.key == pygame.K_d):
+                elif get_magic and (event.key == pygame.K_a or event.key == pygame.K_d):
                   # select ball with arrow keys
                   if sel_magic:
                     refpos = sel_magic.pos
@@ -682,21 +669,23 @@ class Game:
 
                 # magic moving
                 elif sel_magic and event.key == pygame.K_a:
-                  player.magic.move(sel_magic, -3.0)
+                  player.magic.move(sel_magic, diff = -3.0)
                 elif sel_magic and event.key == pygame.K_d:
-                  player.magic.move(sel_magic, 3.0)
+                  player.magic.move(sel_magic, diff = 3.0)
                 elif sel_magic and event.key == pygame.K_w:
                   player.magic.power(sel_magic, diff = 3.0)
                 elif sel_magic and event.key == pygame.K_s:
                   player.magic.power(sel_magic, diff = -3.0)
+
+                # release magic
                 elif sel_magic and event.key == pygame.K_r:
                   if sel_magic:
                     player.magic.release(sel_magic)
                     sel_magic.selected = False
                     sel_magic = False
                 elif event.key == pygame.K_r:
+                  player.magic.release_all()
                   if sel_magic:
-                    player.magic.release_all()
                     sel_magic.selected = False
                     sel_magic = False
 
@@ -716,8 +705,6 @@ class Game:
                   player.magic.move(sel_magic, 0.0)
 
                 # input modes
-                elif event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
-                  cast_magic = False
                 elif event.key == pygame.K_LCTRL or event.key == pygame.K_RCTRL:
                   get_magic = False
           

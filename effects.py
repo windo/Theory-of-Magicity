@@ -6,6 +6,29 @@ from random import random
 global circle_cache, circle_cache_hit, circle_cache_miss
 circle_cache = {}
 circle_cache_hit = circle_cache_miss = 0
+def get_circle(color, radius, screen = False):
+    global circle_cache, circle_cache_hit, circle_cache_miss
+    # color accuracy
+    c = []
+    for i in xrange(len(color)):
+      c.append(min(round(color[i] / 8) * 8, 255))
+    color = tuple(c)
+    # radius accuracy
+    radius = round(radius)
+
+    # try to get it from cache
+    if circle_cache.has_key((color, radius)):
+      circle_cache_hit += 1
+      return circle_cache[(color, radius)]
+    else:
+      circle_cache_miss += 1
+      s = pygame.surface.Surface((radius * 2, radius * 2), pygame.SRCALPHA, 32)
+      pygame.draw.circle(s, color, (radius, radius), radius, 0)
+      if screen:
+        s = s.convert_alpha(screen)
+      circle_cache[(color, radius)] = s
+      return s
+
 class Dot:
       def __init__(self, x, y, xs, ys, age = 0.0):
           self.x   = x
@@ -62,34 +85,12 @@ class ParticleEffect:
               dot.hover = self.magic.hover_height
             self.dots.append(dot)
             
-      def get_circle(self, screen, color, radius):
-          global circle_cache, circle_cache_hit, circle_cache_miss
-          # color accuracy
-          c = []
-          for i in xrange(len(color)):
-            c.append(min(round(color[i] / 8) * 8, 255))
-          color = tuple(c)
-          # radius accuracy
-          radius = round(radius)
-
-          # try to get it from cache
-          if circle_cache.has_key((color, radius)):
-            circle_cache_hit += 1
-            return circle_cache[(color, radius)]
-          else:
-            circle_cache_miss += 1
-            s = pygame.surface.Surface((radius * 2, radius * 2), pygame.SRCALPHA, 32)
-            pygame.draw.circle(s, color, (radius, radius), radius, 0)
-            s = s.convert_alpha(screen)
-            circle_cache[(color, radius)] = s
-            return s
-
       def draw(self, screen, draw_debug = False):
           for dot in self.dots:
             color  = self.get_color(dot)
             radius = self.get_radius(dot)
             # TODO: there really should be a better way to do this (but apparently there isn't?)
-            s = self.get_circle(screen, color, radius)
+            s = get_circle(color, radius, screen)
             if self.magic:
               x = self.magic.world.view.pl2sc_x(dot.pos) + dot.x - radius
               y = self.magic.world.view.sc_h() - dot.hover + dot.y - radius
