@@ -99,7 +99,7 @@ class MagicParticle(actors.Actor):
           actors.Actor.__init__(self, world, pos)
           self.field     = world.get_field(self.fieldtype)
           self.dev       = self.base_dev
-          self.mult      = 1.0
+          self.mult      = 0.0
           self.deadtimer = False
           self.dead      = False
           self.field.add_particle(self)

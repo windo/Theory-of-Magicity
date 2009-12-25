@@ -320,9 +320,10 @@ class Actor(Drawable):
             self.magic_energy = magic_mult * self.initial_energy
           
           # controlled actors most likely want to do something
-          if self.controller and self.last_control + self.control_interval > self.world.get_time():
-            self.controller.update()
-            self.last_control = self.world.get_time()
+          if self.controller:
+            if self.last_control + self.control_interval < self.world.get_time():
+              self.controller.update()
+              self.last_control = self.world.get_time()
       
       def draw(self, screen, draw_debug = False):
           """
@@ -366,6 +367,8 @@ class MagicCaster:
           # register to influence it [speed, mult]
           self.affects[particle] = [0.0, 1.0]
           particle.affect(self)
+          # make sure there is enough magic energy
+          self.balance_energy()
           # return it to the caller
           return particle
       def capture(self, particle):
@@ -713,7 +716,6 @@ class BirdPredator(FlyingController):
           if abs(self.target.pos - self.puppet.pos) < 1.0 and abs(self.target.ypos - self.puppet.ypos) < 1.0:
             self.random_target()
 
-
 class FSMController(Controller):
       states = [ "idle" ]
       start_state = "idle"
@@ -729,7 +731,7 @@ class FSMController(Controller):
           self.state   = False
           self.set_state(self.start_state)
       def debug_info(self):
-          return "%s [%s]" % (Controller.debug_info(self), self.state)
+          return "%s ['%s' %.1fs]" % (Controller.debug_info(self), self.state, self.state_time())
 
       def set_state(self, newstate):
           if not newstate in self.states:
@@ -741,7 +743,6 @@ class FSMController(Controller):
 
       def state_time(self):
           return self.puppet.world.get_time() - self.state_start
-
       def time_passed(self, duration, rand = 0.0):
           passed = self.puppet.world.get_time() - self.action_time
           if passed > duration + rand * random():
@@ -757,7 +758,6 @@ class FSMController(Controller):
           pass
       def state_action(self):
           pass
-
 
 class GuardianController(FSMController):
       states = [ "idle", "guarding" ]

@@ -463,8 +463,8 @@ class Game:
           draw_debug  = False
 
           # input states
-          get_magic  = False
-          sel_magic  = False
+          get_magic = False
+          sel_magic = False
 
           while forever:
             ## update
@@ -599,18 +599,24 @@ class Game:
                   get_magic  = True
                   if sel_magic:
                     sel_magic.selected = False
-                    sel_magic  = False
+                    sel_magic = False
                 
                 # cast magic balls
                 elif event.key == pygame.K_z:
+                  if sel_magic:
+                    sel_magic.selected = False
                   sel_magic = player.magic.new(fields.LightBall)
                   sel_magic.selected = True
                   casting = False
                 elif event.key == pygame.K_x:
+                  if sel_magic:
+                    sel_magic.selected = False
                   sel_magic = player.magic.new(fields.EnergyBall)
                   sel_magic.selected = True
                   casting = False
                 elif event.key == pygame.K_c:
+                  if sel_magic:
+                    sel_magic.selected = False
                   sel_magic = player.magic.new(fields.EarthBall)
                   sel_magic.selected = True
                   casting = False
