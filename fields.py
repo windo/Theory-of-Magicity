@@ -205,7 +205,10 @@ class MagicParticle(actors.Actor):
             s = effects.get_circle((255, 255, 255, 64), 5, screen)
             for caster in self.affects:
               accel, mult = caster.affect_particle(self)
-              screen.blit(s, (x - 5 + accel * 3.0, y - 5 - mult * 3.0))
+              for i in xrange(5):
+                xdiff = accel * 3.0 / 5 * i
+                ydiff = mult  * 3.0 / 5 * i
+                screen.blit(s, (x - 5 + xdiff, y - 5 - ydiff))
 
 
 

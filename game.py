@@ -483,6 +483,7 @@ class Game:
           # input states
           get_magic = False
           sel_magic = False
+          mouse_control = False
 
           while forever:
             ## update
@@ -587,6 +588,7 @@ class Game:
               if event.type == pygame.QUIT:
                 forever = False
               
+              ## keyboard
               # key events
               if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -695,7 +697,7 @@ class Game:
 
           
               # key releases
-              if event.type == pygame.KEYUP:
+              elif event.type == pygame.KEYUP:
                 # movement
                 if event.key == pygame.K_LEFT:
                   player.stop()
@@ -711,6 +713,39 @@ class Game:
                 # input modes
                 elif event.key == pygame.K_LCTRL or event.key == pygame.K_RCTRL:
                   get_magic = False
+
+              ## mouse
+              elif event.type == pygame.MOUSEBUTTONDOWN:
+                pos = view.sc2pl_x(event.pos[0])
+                particles = world.get_actors(pos - 5, pos + 5, include = [fields.MagicParticle])
+                if particles:
+                  # find the closest particle
+                  closest = 5
+                  for particle in particles:
+                    dist = abs(particle.pos - pos)
+                    if dist < closest:
+                      closest = dist
+                      new_particle = particle
+                  if sel_magic:
+                    sel_magic.selected = False
+                  sel_magic          = new_particle
+                  sel_magic.selected = True
+                  mouse_control      = True
+                  pygame.mouse.set_visible(False)
+                else:
+                  pass
+
+              elif event.type == pygame.MOUSEBUTTONUP:
+                mouse_control = False
+                pygame.mouse.set_visible(True)
+                if sel_magic:
+                  player.magic.move(sel_magic, 0)
+
+              elif event.type == pygame.MOUSEMOTION and mouse_control and sel_magic:
+                x, y = event.rel
+                player.magic.move(sel_magic, diff = x)
+                player.magic.power(sel_magic, diff = -y)
+                
           
             # calibration
             self.clock.tick(45)
