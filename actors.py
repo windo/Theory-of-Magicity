@@ -547,11 +547,12 @@ class Dragon(Character):
       in_dev_mode  = True
 
 class Guardian(Character):
-      const_speed    = 0.5
+      const_speed    = 1.0
       initial_hp     = 250
       regeneration   = 2.0
       initial_energy = 30.0
       sprite_names = ["guardian-left", "guardian-right"]
+      in_dev_mode = True
 
 # controllers
 class Controller:
@@ -760,26 +761,55 @@ class FSMController(Controller):
           pass
 
 class GuardianController(FSMController):
-      states = [ "idle", "guarding" ]
+      states = [ "idle", "guarding", "walking" ]
+      danger = [ Dude, Dragon ]
       def __init__(self, puppet):
           FSMController.__init__(self, puppet)
-          self.target = False
-          self.shot   = False
+          self.target   = False
+          self.shot     = False
+          self.waypoint = False
+      def set_waypoint(self, waypoint):
+          self.waypoint = waypoint
 
+      def debug_info(self):
+          return "%s target=%s waypoint=%.3s" % \
+                 (FSMController.debug_info(self), self.target, self.waypoint)
+
+      def get_target(self):
+          closest    = 75.0
+          new_target = False
+          dangers = self.puppet.world.get_actors(self.puppet.pos - closest, self.puppet.pos + closest, include = self.danger)
+          for danger in dangers:
+            dist = abs(danger.pos - self.puppet.pos)
+            if dist < closest:
+              closest = dist
+              new_target = danger
+
+          if new_target:
+            self.target = new_target
+              
       def state_change(self):
           if self.state == "idle":
             if self.time_passed(2.0):
-              dude = self.puppet.world.get_actors(self.puppet.pos - 75, self.puppet.pos + 75, include = [ Dude ])
-              if dude:
-                self.target = dude[0]
-                self.set_state("guarding")
+              self.get_target()
+            if self.target:
+              self.set_state("guarding")
+            elif self.waypoint:
+              self.set_state("walking")
 
           elif self.state == "guarding":
             if self.target.dead or abs(self.target.pos - self.puppet.pos) > 100:
               self.target = False
+              self.get_target()
+
+            if not self.target:
               if self.shot:
                 self.puppet.magic.release(self.shot)
                 self.shot = False
+              self.set_state("idle")
+
+          elif self.state == "walking":
+            if not self.waypoint:
               self.set_state("idle")
 
       def state_action(self):
@@ -810,7 +840,7 @@ class GuardianController(FSMController):
             offset = abs(self.shot.pos - dest_pos)
             if offset > 1.0:
               if offset > 3.0:
-                self.puppet.magic.power(self.shot, 0.0)
+                self.puppet.magic.power(self.shot, -1.0)
               c = min(1.0, abs(self.shot.pos + self.shot.speed - dest_pos) / 3.0)
               if self.shot.pos + self.shot.speed > dest_pos:
                 self.puppet.magic.move(self.shot, -c * self.puppet.magic_energy)
@@ -826,6 +856,18 @@ class GuardianController(FSMController):
                 self.puppet.magic.power(self.shot,  c * self.puppet.magic_energy)
               elif value > dest_value:
                 self.puppet.magic.power(self.shot, -c * self.puppet.magic_energy)
+
+          elif self.state == "walking":
+            if self.time_passed(1.0):
+              if self.puppet.pos > self.waypoint:
+                self.puppet.move_left()
+              else:
+                self.puppet.move_right()
+
+              if abs(self.puppet.pos - self.waypoint) < 1.0:
+                self.puppet.stop()
+                self.waypoint = False
+
 
 class WimpyController(FSMController):
       states   = [ "idle", "flee" ]

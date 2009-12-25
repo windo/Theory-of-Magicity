@@ -573,18 +573,23 @@ class Siege(Story):
           # enemies
           for i in xrange(5):
             dragon = world.new_actor(actors.HuntingDragon, random() * 50.0)
-            dragon.controller.set_waypoint(100)
+            dragon.controller.set_waypoint(50)
 
           # friends
+          self.guardpost = []
           for i in xrange(4):
             dude = world.new_actor(actors.HuntingDude,  100 - random() * 50.0)
-            dude.controller.set_waypoint(0)
+            dude.controller.set_waypoint(50)
+            self.guardpost.append(dude)
 
           # the guardmaster
           world.new_actor(actors.Hut, 300)
           self.guardmaster = world.new_actor(actors.Dude, 310)
-          world.new_actor(actors.Guardian, 315)
-          world.new_actor(actors.Guardian, 320)
+          self.guards = []
+          for i in xrange(2):
+            guard = world.new_actor(actors.ControlledGuardian, 315 + i * 5)
+            guard.controller.danger = [actors.Dragon]
+            self.guards.append(guard)
 
           # player-controlled object
           self.dude = world.new_actor(actors.Dude, -100)
@@ -598,47 +603,88 @@ class Siege(Story):
       def update(self):
           story_time, state_time = self.times()
 
-          if self.state == "battle-lost":
+          if not self.game_over:
+            dudes   = sum([guard.dead and 0 or 1 for guard in self.guardpost])
+            if dudes == 0:
+              self.set_state("guardpost-lost")
+              self.set_result(False)
+
+            dragons = len(self.world.get_actors(include = [actors.Dragon]))
+            if story_time > 120.0 and self.time_passed(30.0, "respawn") and dragons < 5:
+              dragon = self.world.new_actor(actors.HuntingDragon, -random() * 25.0)
+              dragon.controller.set_waypoint(50)
+
+          if self.state == "guardpost-lost":
             self.batch_narrate((
-              (0.0, "All the villagers have been killed!"),
+              (0.0, "All the villagers at the guardpost have been killed!"),
               (2.0, "This is terrible!"),
               (4.0, "Damn you, dragons!"),
+              ))
+
+          elif self.state == "guardpost-secured":
+            self.batch_narrate((
+              (0.0, "The guardians got to the guardpost!"),
+              (2.0, "The village has been secured!"),
+              (4.0, "For now, at least..."),
               ))
             
           elif self.state == "begin":
             self.batch_narrate((
               (2.0, "The villagers are under attack!"),
-              (2.0, "They are outnumbered, I must join them!"),
+              (2.0, "They are outnumbered, I must help them!"),
               ))
+
             dragons = self.world.get_actors(include = [actors.Dragon])
-            dudes   = self.world.get_actors(include = [actors.Dude])
-            if len(dudes) < 2:
-              self.set_state("battle-lost")
-              self.set_result(False)
-            elif len(dragons) == 0:
-              self.set_state("battle-won")
+            if len(dragons) == 0:
+              self.set_state("get-help")
 
             if self.narrated() and self.time_passed(15):
               self.narrate("Slay the dragons!")
 
-          elif self.state == "battle-won":
+          elif self.state == "get-help":
             self.batch_narrate((
               (0.0, "The dragons are defeated!"),
-              (2.0, "Survivor: More dragons are sure to come!"),
-              (4.0, "Survivor: You, stranger, run to the village as fast as you can!"),
-              (4.0, "Survivor: Use positive Light Magic [press 'z'] for extra speed!"),
-              (2.0, "Survivor: We'll hold the dragons back!"),
+              (2.0, "Villager: More dragons are sure to come!"),
+              (4.0, "Villager: You, stranger, run to the village and get help - as fast as you can!"),
+              (4.0, "Villager: Use positive Light Magic [press 'z'] for extra speed!"),
+              (2.0, "Villager: We'll hold the dragons back!"),
               ))
 
-            # TODO: don't use timeout - make sure not being fast enough results in dragons winning
-            time_left = 60 - state_time
             if self.narrated() and self.time_passed(15):
-              self.narrate("I must run to the village really fast [right arrow], just %u seconds left." % (time_left))
+              self.narrate("I must run to the village [right] to get help.")
+              self.narrate("Light magic [press 'z'] ball will increase my speed.", showtime = 2.0, duration = 10.0)
 
             if self.dude.pos > 300:
               self.set_state("village")
+              for in in xrange(len(self.guards)):
+                guard[i].controller.set_waypoint(25.0 - i * 5)
 
           elif self.state == "village":
-            pass
+            self.batch_narrate((
+              (0.0, "The dragons are attacking!"),
+              (2.0, "Villager: Damn!"),
+              (2.0, "Villager: I'll send out these guardians to block their path."),
+              (4.0, "Villager: You go and help keep the guardpost until we have it locked down!"),
+              ))
+            if self.narrated() and self.time_passed(15):
+              self.narrate("I must run back to the guardpost [left] really fast.")
+
+            if self.dude.pos < 50.0:
+              self.set_state("block")
+
+          elif self.state == "block":
+            self.batch_narrate((
+              (0.0, "The guardians are coming."),
+              (2.0, "Villager: Great!"),
+              (4.0, "Villager: Just have to keep extinguishing these dragons until they get here!"),
+              ))
+
+            if self.narrated() and self.time_passed(30):
+              self.narrate("Help hold the guardpost until the guardians get here.")
+
+            if sum([guard.controller.waypoint and 1 or 0 for guard in self.guards]) == 0:
+              self.set_result(True)
+              self.set_state("guardpost-secured")
+
 
 
