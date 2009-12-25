@@ -502,8 +502,9 @@ class Blockade(Story):
           self.default_scenery()
 
           # enemies
-          world.new_actor(actors.ControlledGuardian, 50)
-          world.new_actor(actors.ControlledGuardian, 100)
+          for i in xrange(2):
+            guardian = world.new_actor(actors.ControlledGuardian, 50 + i * 50)
+            guardian.controller.danger.append(actors.Dude)
 
           # player-controlled object
           self.dude = world.new_actor(actors.Dude, 0)
@@ -585,11 +586,11 @@ class Siege(Story):
           # the guardmaster
           world.new_actor(actors.Hut, 300)
           self.guardmaster = world.new_actor(actors.Dude, 310)
-          self.guards = []
+          self.guardians = []
           for i in xrange(2):
-            guard = world.new_actor(actors.ControlledGuardian, 315 + i * 5)
-            guard.controller.danger = [actors.Dragon]
-            self.guards.append(guard)
+            guardian = world.new_actor(actors.ControlledGuardian, 315 + i * 5)
+            guardian.controller.danger = [actors.Dragon]
+            self.guardians.append(guardian)
 
           # player-controlled object
           self.dude = world.new_actor(actors.Dude, -100)
@@ -605,20 +606,30 @@ class Siege(Story):
 
           if not self.game_over:
             dudes   = sum([guard.dead and 0 or 1 for guard in self.guardpost])
+            dragons = len(self.world.get_actors(include = [actors.Dragon]))
             if dudes == 0:
               self.set_state("guardpost-lost")
               self.set_result(False)
-
-            dragons = len(self.world.get_actors(include = [actors.Dragon]))
-            if story_time > 120.0 and self.time_passed(30.0, "respawn") and dragons < 5:
-              dragon = self.world.new_actor(actors.HuntingDragon, -random() * 25.0)
+            elif self.dude.dead:
+              self.set_state("dude-death")
+              self.set_result(False)
+            elif story_time > 120.0 and self.time_passed(30.0, "respawn") and dragons < 5:
+              pos = min(self.dude.pos - 75, -50) - random() * 25
+              dragon = self.world.new_actor(actors.HuntingDragon, pos)
               dragon.controller.set_waypoint(50)
 
           if self.state == "guardpost-lost":
             self.batch_narrate((
               (0.0, "All the villagers at the guardpost have been killed!"),
-              (2.0, "This is terrible!"),
+              (2.0, "This is terrible."),
               (4.0, "Damn you, dragons!"),
+              ))
+
+          elif self.state == "dude-death":
+            self.batch_narrate((
+              (0.0, "Goodbye, cruel world!"),
+              (2.0, "The dragons have tuned me into a heap of ashes..."),
+              (4.0, "The wind shall blow me away."),
               ))
 
           elif self.state == "guardpost-secured":
@@ -656,8 +667,8 @@ class Siege(Story):
 
             if self.dude.pos > 300:
               self.set_state("village")
-              for in in xrange(len(self.guards)):
-                guard[i].controller.set_waypoint(25.0 - i * 5)
+              for i in xrange(len(self.guardians)):
+                self.guardians[i].controller.set_waypoint(25.0 - i * 5)
 
           elif self.state == "village":
             self.batch_narrate((
@@ -682,7 +693,7 @@ class Siege(Story):
             if self.narrated() and self.time_passed(30):
               self.narrate("Help hold the guardpost until the guardians get here.")
 
-            if sum([guard.controller.waypoint and 1 or 0 for guard in self.guards]) == 0:
+            if sum([guardian.controller.waypoint and 1 or 0 for guardian in self.guardians]) == 0:
               self.set_result(True)
               self.set_state("guardpost-secured")
 

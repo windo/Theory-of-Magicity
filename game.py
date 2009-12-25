@@ -155,8 +155,18 @@ class View:
       def pl_x2(self): return self.plane[1]
       def pl_y1(self): return self.plane[2]
       def pl_y2(self): return self.plane[3]
+      def pl_w(self): return self.plane[1] - self.plane[0]
       def sc_w(self): return self.view[0]
       def sc_h(self): return self.view[1]
+
+      def sc2pl_x(self, x):
+          return x * self.mult_x + self.offset_x
+      def sc2pl_y(self, y):
+          return y * self.mult_y + self.offset_y
+      def pl2sc_x(self, x):
+          return (x - self.offset_x) / self.mult_x
+      def pl2sc_y(self, y):
+          return (y - self.offset_y) / self.mult_y
 
       # camera stuff
       def get_center_x(self):
@@ -190,7 +200,23 @@ class View:
           if isinstance(self.anchor, actors.Actor):
             dst  = self.anchor.pos
             # TODO: should use real movement speed
-            dst += self.anchor.speed * 5.0
+            speeddiff = self.anchor.speed * 5.0
+            diff = speeddiff
+            # not too far away
+            maxdiff = self.pl_w() / 3
+            # focus on magic balls
+            if self.anchor.magic and self.anchor.magic.affects:
+              balldiff = 0.0
+              for ball in self.anchor.magic.affects.keys():
+                d = (ball.pos - self.anchor.pos) / 2
+                if d > maxdiff: d = maxdiff
+                elif d < -maxdiff: d = -maxdiff
+                balldiff += d
+              balldiff /= len(self.anchor.magic.affects)
+              diff += balldiff
+            if diff > maxdiff: diff = maxdiff
+            elif diff < -maxdiff: diff = -maxdiff
+            dst += diff
           else:
             dst = self.anchor
           diff = dst - self.get_center_x()
@@ -215,14 +241,6 @@ class View:
               const = 1.0
             self.move_x(diff * const * timediff / self.find_time)
 
-      def sc2pl_x(self, x):
-          return x * self.mult_x + self.offset_x
-      def sc2pl_y(self, y):
-          return y * self.mult_y + self.offset_y
-      def pl2sc_x(self, x):
-          return (x - self.offset_x) / self.mult_x
-      def pl2sc_y(self, y):
-          return (y - self.offset_y) / self.mult_y
 
 class World:
       """

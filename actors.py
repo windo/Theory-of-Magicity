@@ -762,7 +762,7 @@ class FSMController(Controller):
 
 class GuardianController(FSMController):
       states = [ "idle", "guarding", "walking" ]
-      danger = [ Dude, Dragon ]
+      danger = [ Dragon ]
       def __init__(self, puppet):
           FSMController.__init__(self, puppet)
           self.target   = False
@@ -1080,7 +1080,7 @@ class HunterController(FSMController):
 
 class HuntingDragon(Dragon):
       control = HunterController
-      prey    = [Dude, Rabbit]
+      prey    = [Dude, Rabbit, Guardian]
 class HuntingDude(Dude):
       control = HunterController
       prey    = [Dragon]
