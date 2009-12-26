@@ -374,15 +374,19 @@ class Game:
           titleshadow = self.loader.biggoth.render(self.gamename, True, (48, 48, 48))
 
           menu = [
-                  { "id":  "shepherd", "txt": "Gentle Shepherd" },
-                  { "id":  "massacre", "txt": "Fiery Massacre" },
-                  { "id":  "blockade", "txt": "Guardian Blockade" },
-                  { "id":  "siege", "txt": "Under Siege" },
-                  { "id":  "exit", "txt": "Exit Game" },
+                  { "action":  stories.Shepherd, "music": "happytheme", "txt": "Gentle Shepherd" },
+                  { "action":  stories.Massacre, "music": "warmarch2",  "txt": "Fiery Massacre" },
+                  { "action":  stories.Blockade, "music": "warmarch2",  "txt": "Guardian Blockade" },
+                  { "action":  stories.Siege,    "music": "warmarch2",  "txt": "Under Siege" },
+                  { "action":  "exit", "txt": "Exit Game" },
                  ]
+          i = 0
           for item in menu:
+            item["seq"]  = i
             item["low"]  = self.loader.smallgoth.render(item["txt"], True, (64, 64, 64))
             item["high"] = self.loader.smallgoth.render(item["txt"], True, (192, 192, 192))
+            item["pos"]  = 150 + 72 * i
+            i += 1
 
           # bg
           background = self.loader.get_sprite("title-bg")
@@ -393,14 +397,8 @@ class Game:
             self.center_blit(titleshadow, 5, 25)
             self.center_blit(title, 0, 20)
             # menu
-            i = 0
             for item in menu:
-              pos = 150 + 72 * i
-              if i == select:
-                self.center_blit(item["high"], 0, pos)
-              else:
-                self.center_blit(item["low"], 0, pos)
-              i += 1
+              self.center_blit(item[item["seq"] == select and "high" or "low"], 0, item["pos"])
             # set on screen
             pygame.display.update()
 
@@ -419,23 +417,31 @@ class Game:
                   select += 1
 
                 elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
-                  action = menu[select]["id"]
-                  print "Running level: %s" % (action)
-                  if action == "exit":
+                  item = menu[select]
+                  if item["action"] == "exit":
                     forever = False
-                  elif action == "shepherd":
-                    self.set_music("happytheme")
-                    self.run_story(stories.Shepherd)
-                  elif action == "massacre":
-                    self.set_music("warmarch2")
-                    self.run_story(stories.Massacre)
-                  elif action == "blockade":
-                    self.set_music("warmarch2")
-                    self.run_story(stories.Blockade)
-                  elif action == "siege":
-                    self.set_music("warmarch2")
-                    self.run_story(stories.Siege)
+                  else:
+                    self.set_music(item["music"])
+                    self.run_story(item["action"])
                   self.set_music("happytheme")
+
+              elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                  item = menu[select]
+                  if item["action"] == "exit":
+                    forever = False
+                  else:
+                    self.set_music(item["music"])
+                    self.run_story(item["action"])
+                  self.set_music("happytheme")
+              elif event.type == pygame.MOUSEMOTION:
+                x, y = event.pos
+                center = self.view.sc_w() / 2
+                for item in menu:
+                  ofs = item["low"].get_width() / 2
+                  if center - ofs < x < center + ofs:
+                    if item["pos"] < y < item["pos"] + item["low"].get_height():
+                      select = item["seq"]
 
             # stay in menu
             if select == len(menu):
@@ -447,7 +453,7 @@ class Game:
             self.clock.tick(45)
 
       def run_story(self, Story):
-          # set the game up
+          # set the game up, convenience references (without self.)
           view   = self.view
           screen = self.screen
           world  = World(self.loader, fields.all, view)
@@ -480,10 +486,15 @@ class Game:
           # extra debugging(?) output
           draw_debug  = False
 
-          # input states
+          ## input states
+          # boolean: capture magic balls
           get_magic = False
+          # reference to selected magic ball or False
           sel_magic = False
+          # boolean: currently ball selected with mouse
           mouse_control = False
+          # boolean: use 'a' and 'd' to control player
+          mouse_mode    = False
 
           while forever:
             ## update
@@ -591,9 +602,9 @@ class Game:
               ## keyboard
               # key events
               if event.type == pygame.KEYDOWN:
+                # misc
                 if event.key == pygame.K_ESCAPE:
                   forever = False
-
                 if event.key == pygame.K_p:
                   world.pause()
           
@@ -602,7 +613,13 @@ class Game:
                   player.move_left()
                 elif event.key == pygame.K_RIGHT:
                   player.move_right()
+                # mouse_mode player moving
+                elif mouse_mode and event.key == pygame.K_a:
+                  player.move_left()
+                elif mouse_mode and event.key == pygame.K_d:
+                  player.move_right()
 
+                # explicit camera control
                 elif event.key == pygame.K_j:
                   view.follow(False)
                   view.move_x(-10.0)
@@ -620,6 +637,8 @@ class Game:
                   if sel_magic:
                     sel_magic.selected = False
                     sel_magic = False
+                elif event.key == pygame.K_m:
+                  mouse_mode = not mouse_mode
                 
                 # cast magic balls
                 elif event.key == pygame.K_z:
@@ -695,7 +714,6 @@ class Game:
                     sel_magic.selected = False
                     sel_magic = False
 
-          
               # key releases
               elif event.type == pygame.KEYUP:
                 # movement
@@ -703,11 +721,15 @@ class Game:
                   player.stop()
                 elif event.key == pygame.K_RIGHT:
                   player.stop()
+                elif mouse_mode and event.key == pygame.K_a:
+                  player.stop()
+                elif mouse_mode and event.key == pygame.K_d:
+                  player.stop()
 
                 # magic movement
-                elif event.key == pygame.K_a and sel_magic:
+                elif sel_magic and event.key == pygame.K_a:
                   player.magic.move(sel_magic, 0.0)
-                elif event.key == pygame.K_d and sel_magic:
+                elif sel_magic and event.key == pygame.K_d:
                   player.magic.move(sel_magic, 0.0)
 
                 # input modes
@@ -716,35 +738,41 @@ class Game:
 
               ## mouse
               elif event.type == pygame.MOUSEBUTTONDOWN:
-                pos = view.sc2pl_x(event.pos[0])
-                particles = world.get_actors(pos - 5, pos + 5, include = [fields.MagicParticle])
-                if particles:
-                  # find the closest particle
-                  closest = 5
-                  for particle in particles:
-                    dist = abs(particle.pos - pos)
-                    if dist < closest:
-                      closest = dist
-                      new_particle = particle
-                  if sel_magic:
-                    sel_magic.selected = False
-                  sel_magic          = new_particle
-                  sel_magic.selected = True
-                  mouse_control      = True
-                  pygame.mouse.set_visible(False)
-                else:
+                if event.button == 1:
+                  pos = view.sc2pl_x(event.pos[0])
+                  particles = world.get_actors(pos - 5, pos + 5, include = [fields.MagicParticle])
+                  if particles:
+                    # find the closest particle
+                    closest = 5
+                    for particle in particles:
+                      dist = abs(particle.pos - pos)
+                      if dist < closest:
+                        closest = dist
+                        new_particle = particle
+                    # deselect old
+                    if sel_magic:
+                      sel_magic.selected = False
+                    # capture, select
+                    sel_magic          = new_particle
+                    player.magic.capture(sel_magic)
+                    sel_magic.selected = True
+                    mouse_control      = True
+                    pygame.mouse.set_visible(False)
+
+                elif event.button == 2:
                   pass
 
               elif event.type == pygame.MOUSEBUTTONUP:
-                mouse_control = False
-                pygame.mouse.set_visible(True)
-                if sel_magic:
-                  player.magic.move(sel_magic, 0)
+                if event.button == 1:
+                  mouse_control = False
+                  pygame.mouse.set_visible(True)
+                  if sel_magic:
+                    player.magic.move(sel_magic, 0)
 
               elif event.type == pygame.MOUSEMOTION and mouse_control and sel_magic:
                 x, y = event.rel
-                player.magic.move(sel_magic, diff = x)
-                player.magic.power(sel_magic, diff = -y)
+                player.magic.move(sel_magic, diff = x / 4)
+                player.magic.power(sel_magic, diff = -y / 4)
                 
           
             # calibration
