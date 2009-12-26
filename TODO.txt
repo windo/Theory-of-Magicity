@@ -5,9 +5,10 @@ Stuff to do, in order:
  * further camera improvements - less switching during turing
   * not so jumpy
   * delayed speed estimation?
- * implement "visual" magic
+ * more levels?
 
 Ideas:
+ * implement "visual" magic
  * balls
   * merge/split - when low tension, forces not opposing
   * release/acquire - always
