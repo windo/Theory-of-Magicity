@@ -220,22 +220,22 @@ class Shepherd(Story):
               (4.0, "Evidently, they prefer to eat over there..."),
               (2.0, "Well, we'll see about that!"),
               (2.0, "I've got some tricks up my sleeve..."),
-              (2.0, "Energy magic is going to help me out!"),
+              (2.0, "Wind magic is going to help me out!"),
               (2.0, "Now, how did that work exactly..."),
               (2.0, "Right!"),
-              (5.0, "I should cast an Energy Magic Ball [press 'x'].", 10.0),
+              (5.0, "I should cast a Wind Magic Ball [press 'x'].", 10.0),
               ))
 
             ballcast = False
             for particle in self.dude.magic.affects.keys():
-              if isinstance(particle, fields.EnergyBall):
+              if isinstance(particle, fields.WindBall):
                 ballcast = True
                 break
             if ballcast:
               self.set_state("particle_control")
 
             if self.narrated() and self.time_passed(15) and not ballcast:
-              self.narrate("I need to cast an Energy Magic Ball [press 'x'].", duration = 10.0)
+              self.narrate("I need to cast a Wind Magic Ball [press 'x'].", duration = 10.0)
 
           elif self.state == "particle_control":
             self.batch_narrate((
@@ -250,7 +250,7 @@ class Shepherd(Story):
               ))
 
             for particle in self.dude.magic.affects.keys():
-              if isinstance(particle, fields.EnergyBall):
+              if isinstance(particle, fields.WindBall):
                 if abs(particle.pos - self.dude.pos) < 1.0:
                   self.set_state("particle_power")
                   break
@@ -272,7 +272,7 @@ class Shepherd(Story):
             close    = False
             negative = False
             for particle in self.dude.magic.affects.keys():
-              if isinstance(particle, fields.EnergyBall):
+              if isinstance(particle, fields.WindBall):
                 ballcast = True
                 if abs(particle.pos - self.dude.pos) < 1.0:
                   close = True
@@ -283,11 +283,11 @@ class Shepherd(Story):
             
             if self.narrated() and self.time_passed(15):
               if not ballcast:
-                self.narrate("I need to have an Energy Magic Ball [press 'x'].", duration = 10.0)
+                self.narrate("I need to have a Wind Magic Ball [press 'x'].", duration = 10.0)
               if not negative:
-                self.narrate("The Energy Magic Ball needs to have a negative energy ['s' key].", duration = 10.0)
+                self.narrate("The Wind Magic Ball needs to have a negative energy ['s' key].", duration = 10.0)
               if not close:
-                self.narrate("The Energy Magic Ball needs to be close to me ['a' and 'd' keys].", duration = 10.0)
+                self.narrate("The Wind Magic Ball needs to be close to me ['a' and 'd' keys].", duration = 10.0)
 
           elif self.state == "find_rabbits":
             self.batch_narrate((
@@ -311,7 +311,7 @@ class Shepherd(Story):
             self.batch_narrate((
               (0.0, "...13, 14, 15!"),
               (2.0, "That's the last one!"),
-              (6.0, "So, if I can make an Energy Magic Ball [press 'x']..."),
+              (6.0, "So, if I can make a Wind Magic Ball [press 'x']..."),
               (2.0, "I can change the speed and direction of the wind ['w' and 's' keys]..."),
               (2.0, "And move it close to my rabbits ['a' and 'd' keys]..."),
               (3.0, "I should have them gathered between the posts in no time!"),
@@ -319,7 +319,7 @@ class Shepherd(Story):
               ))
 
             if self.narrated() and self.time_passed(30):
-              self.narrate("I should use an Energy Magic Ball [press 'x']...", duration = 10.0)
+              self.narrate("I should use a Wind Magic Ball [press 'x']...", duration = 10.0)
               self.narrate("...change it's wind direction ['w' and 's' keys]...", duration = 10.0)
               self.narrate("...and move it close to rabbits ['a' and 'd' keys]...", duration = 10.0)
               self.narrate("...to guide them between the posts [to the right].", duration = 10.0)
@@ -403,28 +403,28 @@ class Massacre(Story):
             if self.narrated() and self.time_passed(15):
               self.narrate("Move left, away from the dragons [left arrow].", duration = 10.0)
             if self.dude.pos < -50.0:
-              self.set_state("earthmagic")
+              self.set_state("lifemagic")
 
-          elif self.state == "earthmagic":
+          elif self.state == "lifemagic":
             self.batch_narrate((
               (0.0, "This is far enough, should be safe."),
               (6.0, "Those dragons can be pretty dangerous."),
-              (2.0, "They were using Earth Magic to kill my poor rabbits."),
-              (2.0, "To fight them, I must also use Earth Magic."),
-              (4.0, "I should cast an Earth Magic Ball [press 'c']."),
+              (2.0, "They were using Life Magic to kill my poor rabbits."),
+              (2.0, "To fight them, I must also use Life Magic."),
+              (4.0, "I should cast an Life Magic Ball [press 'c']."),
               ))
 
             ballcast = False
             for particle in self.dude.magic.affects.keys():
-              if isinstance(particle, fields.EarthBall):
+              if isinstance(particle, fields.LifeBall):
                 ballcast = True
             if ballcast:
               self.set_state("particle_control")
             if self.narrated() and self.time_passed(15):
               if ballcast:
-                self.narrate("Good, you have cast an Earth Magic Ball for practice.")
+                self.narrate("Good, you have cast a Life Magic Ball for practice.")
               else:
-                self.narrate("And also cast an Earth Magic Ball [press 'c'].", duration = 10.0)
+                self.narrate("And also cast a Life Magic Ball [press 'c'].", duration = 10.0)
 
           elif self.state == "particle_control":
             self.batch_narrate((
@@ -437,7 +437,7 @@ class Massacre(Story):
 
             if self.narrated() and self.time_passed(30):
               self.batch_narrate((
-                (0.0, "Try to make an Earth magic ball [press 'c'].", 15.0),
+                (0.0, "Try to make a Life magic ball [press 'c'].", 15.0),
                 (5.0, "Make it's power negative ['s' key].", 15.0),
                 (5.0, "And move it close to yourself ['a' and 'd' keys].", 15.0)
                 ), "instructions")
@@ -445,7 +445,7 @@ class Massacre(Story):
 
             # check for the healing ball
             for particle in self.dude.magic.affects.keys():
-              if isinstance(particle, fields.EarthBall):
+              if isinstance(particle, fields.LifeBall):
                 if self.dude.magic.affects[particle][1] < 0.0:
                   if abs(particle.pos - self.dude.pos) < 1.0:
                     self.set_state("healing_explanation")
@@ -453,7 +453,7 @@ class Massacre(Story):
           elif self.state == "healing_explanation":
             self.batch_narrate((
               (0.0, "Well done!"),
-              (2.0, "Negative Earth magic has a restoring effect on health."),
+              (2.0, "Negative Life magic has a restoring effect on health."),
               (4.0, "It's the opposite of the damaging magic balls the dragons were using."),
               (4.0, "Two such opposite balls will even cancel each other out!"),
               (4.0, "I think I'm about ready to fight the dragons now."),
@@ -551,7 +551,7 @@ class Blockade(Story):
                (4.0, "And now these guardians are blocking my path!"),
                (4.0, "If I can't get through, I'm toast!"),
                (2.0, "Literally!"),
-               (5.0, "Seems as if they're using Light Magic to block me [press 'z']."),
+               (5.0, "Seems as if they're using Time Magic to block me [press 'z']."),
                (5.0, "Oh no, the dragons are here!"),
                ))
             if self.narrated(0):
@@ -579,13 +579,13 @@ class Siege(Story):
           # friends
           self.guardpost = []
           for i in xrange(4):
-            dude = world.new_actor(actors.HuntingDude,  100 - random() * 50.0)
-            dude.controller.set_waypoint(50)
-            self.guardpost.append(dude)
+            villager = world.new_actor(actors.HuntingVillager,  100 - random() * 50.0)
+            villager.controller.set_waypoint(50)
+            self.guardpost.append(villager)
 
           # the guardmaster
           world.new_actor(actors.Hut, 300)
-          self.guardmaster = world.new_actor(actors.Dude, 310)
+          self.guardmaster = world.new_actor(actors.Villager, 310)
           self.guardians = []
           for i in xrange(2):
             guardian = world.new_actor(actors.ControlledGuardian, 315 + i * 5)
@@ -605,9 +605,9 @@ class Siege(Story):
           story_time, state_time = self.times()
 
           if not self.game_over:
-            dudes   = sum([guard.dead and 0 or 1 for guard in self.guardpost])
-            dragons = len(self.world.get_actors(include = [actors.Dragon]))
-            if dudes == 0:
+            villagers = len(self.guardpost) - sum([guard.dead and 1 or 0 for guard in self.guardpost])
+            dragons   = len(self.world.get_actors(include = [actors.Dragon]))
+            if villagers == 0:
               self.set_state("guardpost-lost")
               self.set_result(False)
             elif self.dude.dead:
@@ -628,7 +628,7 @@ class Siege(Story):
           elif self.state == "dude-death":
             self.batch_narrate((
               (0.0, "Goodbye, cruel world!"),
-              (2.0, "The dragons have tuned me into a heap of ashes..."),
+              (2.0, "The dragons have turned me into a heap of ashes..."),
               (4.0, "The wind shall blow me away."),
               ))
 
@@ -657,15 +657,15 @@ class Siege(Story):
               (0.0, "The dragons are defeated!"),
               (2.0, "Villager: More dragons are sure to come!"),
               (4.0, "Villager: You, stranger, run to the village and get help - as fast as you can!"),
-              (4.0, "Villager: Use positive Light Magic [press 'z'] for extra speed!"),
+              (4.0, "Villager: Use positive Time Magic [press 'z'] for extra speed!"),
               (2.0, "Villager: We'll hold the dragons back!"),
               ))
 
             if self.narrated() and self.time_passed(15):
               self.narrate("I must run to the village [right] to get help.")
-              self.narrate("Light magic [press 'z'] ball will increase my speed.", showtime = 2.0, duration = 10.0)
+              self.narrate("Time magic [press 'z'] ball will increase my speed.", showtime = 2.0, duration = 10.0)
 
-            if self.dude.pos > 300:
+            if self.dude.pos > 290:
               self.set_state("village")
               for i in xrange(len(self.guardians)):
                 self.guardians[i].controller.set_waypoint(25.0 - i * 5)

@@ -184,9 +184,9 @@ class Actor(Drawable):
           Drawable.__init__(self, world, pos)
 
           # field references for convenience
-          self.LightField = self.world.get_field(fields.LightField)
-          self.EnergyField = self.world.get_field(fields.EnergyField)
-          self.EarthField = self.world.get_field(fields.EarthField)
+          self.TimeField = self.world.get_field(fields.TimeField)
+          self.WindField = self.world.get_field(fields.WindField)
+          self.LifeField = self.world.get_field(fields.LifeField)
 
           # actor clock, used to calibrate movement/damage/etc during update
           self.last_update  = world.get_time()
@@ -270,9 +270,9 @@ class Actor(Drawable):
           self.last_update = now
           
           if self.feel_magic:
-            energyfield = self.EnergyField.value(self.pos)
-            lightfield  = self.LightField.value(self.pos)
-            earthfield  = self.EarthField.value(self.pos)
+            windfield = self.WindField.value(self.pos)
+            timefield = self.TimeField.value(self.pos)
+            lifefield = self.LifeField.value(self.pos)
             
           # update movement
           if self.const_speed or self.const_accel:
@@ -281,8 +281,8 @@ class Actor(Drawable):
             self.yspeed += self.timediff * self.yaccel
             # magical movement
             if self.feel_magic:
-              magic_speed = energyfield * 10.0
-              magic_mult  = lightfield
+              magic_speed = windfield * 10.0
+              magic_mult  = timefield
               if magic_mult > 0:
                 magic_mult *= 5.0
               else:
@@ -299,12 +299,12 @@ class Actor(Drawable):
 
           # update hp
           if self.initial_hp and self.feel_magic:
-            light_damage  = abs(lightfield)    * 10.0
-            energy_damage = abs(energyfield)   * 10.0
-            earth_damage  = max(earthfield, 0) * 25.0
-            self.hp -= self.timediff * (light_damage + energy_damage + earth_damage)
+            time_damage = abs(timefield)    * 10.0
+            wind_damage = abs(windfield)    * 10.0
+            life_damage = max(lifefield, 0) * 25.0
+            self.hp -= self.timediff * (time_damage + wind_damage + life_damage)
             if self.hp < self.initial_hp:
-              magic_regen = max(-earthfield, 0) * 12.5
+              magic_regen = max(-lifefield, 0) * 12.5
               self.hp += self.timediff * (self.regeneration + magic_regen)
             if self.hp > self.initial_hp:
               self.hp = self.initial_hp
@@ -316,7 +316,7 @@ class Actor(Drawable):
 
           # set magic energy
           if self.initial_energy and self.feel_magic:
-            magic_mult = earthfield / 2.0 + 1.0
+            magic_mult = lifefield / 2.0 + 1.0
             self.magic_energy = magic_mult * self.initial_energy
           
           # controlled actors most likely want to do something
@@ -529,6 +529,10 @@ class Dude(Character):
       snd_death    = ["cry"]
       stacking     = 25
       in_dev_mode  = True
+
+class Villager(Dude):
+      sprite_names = ["villager-left", "villager-right"]
+      stacking     = 20
 
 class Rabbit(Character):
       const_speed  = 9.0
@@ -828,7 +832,7 @@ class GuardianController(FSMController):
 
             # block the path
             if not self.shot or self.shot.dead:
-              self.shot = self.puppet.magic.new(fields.LightBall)
+              self.shot = self.puppet.magic.new(fields.TimeBall)
 
             if self.target.pos < self.puppet.pos:
               dest_pos = self.puppet.pos - 20.0
@@ -849,7 +853,7 @@ class GuardianController(FSMController):
 
             # Field value
             if offset < 3.0:
-              value = self.puppet.LightField.value(self.shot.pos)
+              value = self.puppet.TimeField.value(self.shot.pos)
               diff  = dest_value - value
               c = min(1.0, abs(diff) / 0.05)
               if value < dest_value:
@@ -1043,7 +1047,7 @@ class HunterController(FSMController):
               else:
                 self.puppet.move_left()
               self.puppet.stop()
-              self.shot = self.puppet.magic.new(fields.EarthBall)
+              self.shot = self.puppet.magic.new(fields.LifeBall)
               self.puppet.magic.power(self.shot, 10.0)
               if self.target.pos > self.shot.pos:
                 self.puppet.magic.move(self.shot, 3.0)
@@ -1070,7 +1074,7 @@ class HunterController(FSMController):
           elif self.state == "heal":
             if not self.shot:
               self.puppet.stop()
-              self.shot = self.puppet.magic.new(fields.EarthBall)
+              self.shot = self.puppet.magic.new(fields.LifeBall)
               self.puppet.magic.power(self.shot, -10.0)
 
             if self.shot.pos + self.shot.speed < self.puppet.pos:
@@ -1081,7 +1085,7 @@ class HunterController(FSMController):
 class HuntingDragon(Dragon):
       control = HunterController
       prey    = [Dude, Rabbit, Guardian]
-class HuntingDude(Dude):
+class HuntingVillager(Villager):
       control = HunterController
       prey    = [Dragon]
 class ScaredRabbit(Rabbit):

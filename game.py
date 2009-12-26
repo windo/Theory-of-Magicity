@@ -40,6 +40,8 @@ class ResourceLoader:
           
           self.sprite("dude_svg", "dude-right", 100, resize = (50, 200))
           self.sprite("dude_svg", "dude-left", 100, flip = True, resize = (50, 200))
+          self.sprite("villager", "villager-right", 100, resize = (50, 200))
+          self.sprite("villager", "villager-left", 100, flip = True, resize = (50, 200))
           self.sprite("rabbit_svg", "rabbit-right", 100, resize = (50, 50))
           self.sprite("rabbit_svg", "rabbit-left", 100, flip = True, resize = (50, 50))
           self.sprite("dragon_svg", "dragon-right", 100, resize = (50, 100))
@@ -644,19 +646,19 @@ class Game:
                 elif event.key == pygame.K_z:
                   if sel_magic:
                     sel_magic.selected = False
-                  sel_magic = player.magic.new(fields.LightBall)
+                  sel_magic = player.magic.new(fields.TimeBall)
                   sel_magic.selected = True
                   casting = False
                 elif event.key == pygame.K_x:
                   if sel_magic:
                     sel_magic.selected = False
-                  sel_magic = player.magic.new(fields.EnergyBall)
+                  sel_magic = player.magic.new(fields.WindBall)
                   sel_magic.selected = True
                   casting = False
                 elif event.key == pygame.K_c:
                   if sel_magic:
                     sel_magic.selected = False
-                  sel_magic = player.magic.new(fields.EarthBall)
+                  sel_magic = player.magic.new(fields.LifeBall)
                   sel_magic.selected = True
                   casting = False
 
@@ -771,8 +773,8 @@ class Game:
 
               elif event.type == pygame.MOUSEMOTION and mouse_control and sel_magic:
                 x, y = event.rel
-                player.magic.move(sel_magic, diff = x / 4)
-                player.magic.power(sel_magic, diff = -y / 4)
+                player.magic.move(sel_magic, diff = x / 2)
+                player.magic.power(sel_magic, diff = -y / 2)
                 
           
             # calibration

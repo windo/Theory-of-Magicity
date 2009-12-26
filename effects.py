@@ -241,7 +241,6 @@ class Energy(ParticleEffect):
           dot.xs = math.sin(6 * dot.age + dot.xseed * dot.xdiff) * 20.0
           dot.ys = math.sin(6 * dot.age + dot.yseed) * 20.0
           
-
 if __name__ == "__main__":
   # TODO: broken since merging to game
   screen  = pygame.display.set_mode((500, 200)) #, pygame.FULLSCREEN)

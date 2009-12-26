@@ -10,17 +10,46 @@
 <ul>
 <li/><b>Fun for the whole family!</b>
 <li/>Physics-like magic system (three magic effects)
-<li/>Three increasingly difficult (but short) levels with <u>storyline</u>
+<li/>Four increasingly difficult (but short) levels with <u>storyline</u>
 <li/>Super-fancy visual particle effects
 <li/>Two original music tracks
 <li/>Mediocre graphics
 <li/>Lowsy sound effects
 <li/><blink>Appalling web site!</blink>
 </ul>
-<p>Screenshot:<br/><a href="screenshot.png"><img src="screenshot_thumb.png"></a></p>
+<p>Screenshots:<br/>
+<a href="screenshot1.png"><img src="screenshot1_thumb.png"></a>
+<a href="screenshot2.png"><img src="screenshot2_thumb.png"></a>
+</p>
 
 <h4>Download</h4>
-<p>Binary release for <a href="files/magicity-win32-0.3beta.zip">win32</a>: built via py2exe under wine, hopefully it works. Let me know if you have any problems.</p>
-<p>And the <a href="files/magicity-src-0.3beta.tar.gz">source</a> release, suitable for real operating systems (requires python and pygame).</p>
+<p>Binary release for <a href="files/magicity-win32-0.4beta.zip">win32</a>: built via py2exe under wine, hopefully it works. Let me know if you have any problems.</p>
+<p>And the <a href="files/magicity-src-0.4beta.tar.gz">source</a> release, suitable for real operating systems (requires python and pygame).</p>
 </body>
+
+<h4>Magic</h4>
+<p>The game world contains 3 "magic fields": Time, Wind and Life: Time magic compresses and expands time (affects movement), Wind magic pushes characters around and Life magic reduces or regenerates health.</p>
+<p>Each magic field fills the entire game world and each character is affected by each field according to it's value at the characters position in the world. The characters can affect the "magic fields" by creating and moving "magic balls" that influence their respective fields around the balls.</p>
+<h4>Controls</h4>
+<p>Game controls as of 0.4beta:</p>
+<table>
+<tr /><th />Keys<th />Effect
+<tr /><td />left/right arrow<td />Move character
+<tr /><td />z, x, c<td />create Time, Wind, Life magic balls
+<tr /><td />a, d<td />move currently selected ball left or right
+<tr /><td />w, s<td />increase or decrease the power of currently selected ball
+<tr /><td />r<td />release (stop affecting) currently selected ball (or all balls, if none selected)
+<tr /><td />ctrl + a, d<td />capture (select) balls in left or right direction
+<tr /><td />ctrl + 1 - 9<td />capture (select) balls by their index number
+<tr /><td />p<td />pause game
+<tr /><td />m<td />set "mouse mode" where 'a' and 'd' move the character, not magic ball
+<tr /><td />esc<td />exit game
+<tr /><td />tab<td />show some debug information
+<tr /><td />j, l<td />freely move camera left or right
+<tr /><td />k<td />refocus camera on character
+<tr /><th />Mouse<th />Effect
+<tr /><td />left button<td />capture a ball
+<tr /><td />movement<td />move and set the power of currently selected magic ball
+</table>
+
 </html>

@@ -58,26 +58,26 @@ class MagicField:
                 txt = self.loader.debugfont.render(txt, True, (255, 255, 255))
                 screen.blit(txt, (pos, ypos))
 
-# Light
+# Time
 # affects: speed < health regen? > vision
 # TODO: vision effects
-class LightField(MagicField):
+class TimeField(MagicField):
       basevalue = 0.0
       color  = (192, 192, 255)
 
-# Energy
+# Wind
 # affects: right < health regen? > left
-class EnergyField(MagicField):
+class WindField(MagicField):
       color = (255, 255, 128)
 
-# Earth
+# Life
 # affects: energy regen <-> health regen
-class EarthField(MagicField):
+class LifeField(MagicField):
       color = (192, 64, 192)
 
-all = [ LightField,
-        EnergyField,
-        EarthField ]
+all = [ TimeField,
+        WindField,
+        LifeField ]
 
 import actors
 class MagicParticle(actors.Actor):
@@ -206,21 +206,21 @@ class MagicParticle(actors.Actor):
             for caster in self.affects:
               accel, mult = caster.affect_particle(self)
               for i in xrange(5):
-                xdiff = accel * 3.0 / 5 * i
-                ydiff = mult  * 3.0 / 5 * i
+                xdiff = accel * 55.0 / 10 / 5 * i
+                ydiff = mult  * 55.0 / 10 / 5 * i
                 screen.blit(s, (x - 5 + xdiff, y - 5 - ydiff))
 
 
 
-class LightBall(MagicParticle):
+class TimeBall(MagicParticle):
       sprite_names = []
       effectors    = [ effects.Energy ]
-      fieldtype    = LightField
-class EnergyBall(MagicParticle):
+      fieldtype    = TimeField
+class WindBall(MagicParticle):
       sprite_names = []
       effectors    = [ effects.Wind ]
-      fieldtype    = EnergyField
-class EarthBall(MagicParticle):
+      fieldtype    = WindField
+class LifeBall(MagicParticle):
       sprite_names = []
       effectors    = [ effects.Fire, effects.Nature ]
-      fieldtype    = EarthField
+      fieldtype    = LifeField

@@ -1,17 +1,10 @@
 Stuff to do, in order:
- * finish Siege story
-  * run, get help, get back, fight, secure position
-  * focus on: big battle, speed
- * controls improvement
-  * implement mouse control (for balls)
+ * sound effects
+  * creature sounds should not be so lowsy
+  * each field/ball has a sound effect
  * further camera improvements - less switching during turing
   * not so jumpy
   * delayed speed estimation?
-  * following actor + controlled ball(s)?
- * sound effects
-  * creature sounds
-   * should not be so lowsy
-  * each field/ball has a sound effect
  * implement "visual" magic
 
 Ideas:
