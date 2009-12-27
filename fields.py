@@ -89,17 +89,20 @@ class MagicParticle(actors.Actor):
       initial_hp   = 0
       directed     = False
       stacking     = 26
+      in_dev_mode  = True
 
       # Particle params
       base_dev     = 5.0
       base_mult    = 10.0
-      mult_speed   = 0.25  # percentage change per second
+      base_coeff   = 0.8  # seems that this is the maximum output with dev=5 and mult=10, used to normalize the mult
+      mult_speed   = 0.25 # percentage change per second
 
       def __init__(self, world, pos):
           actors.Actor.__init__(self, world, pos)
           self.field     = world.get_field(self.fieldtype)
           self.dev       = self.base_dev
           self.mult      = 0.0
+          self.accel     = 0.0
           self.deadtimer = False
           self.dead      = False
           self.field.add_particle(self)
@@ -120,7 +123,8 @@ class MagicParticle(actors.Actor):
 
       def debug_info(self):
           desc  = actors.Actor.debug_info(self)
-          desc += "\nAffecting:\n"
+          desc += "\nState: acc=%.1f mult=%.1f\n" % (self.accel, self.mult)
+          desc += "Affecting:\n"
           for aff in self.affects:
             name      = str(aff.actor)
             acc, mult = aff.affect_particle(self)
@@ -135,7 +139,7 @@ class MagicParticle(actors.Actor):
 
       # particle params (position, normal distribution params) for field calculation
       def get_params(self):
-          return [self.pos, self.dev, self.mult]
+          return [self.pos, self.dev, self.mult / self.coeff]
 
       def destroy(self):
           # no more field effects
@@ -169,8 +173,11 @@ class MagicParticle(actors.Actor):
             affects = caster.affect_particle(self)
             accel += affects[0]
             mult  += affects[1]
+          # smooth changing of multiplier
+          multdiff = (mult - self.mult)
+          self.mult += self.timediff * multdiff * self.mult_speed
+          # acceleration is immediate 
           self.accel = accel * 3.0
-          self.mult += (mult - self.mult) * self.mult_speed * self.timediff
 
           # if the power drops too low, terminate itself
           if abs(self.mult) < 0.1:
