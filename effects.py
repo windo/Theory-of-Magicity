@@ -121,11 +121,11 @@ class ParticleEffect:
             # TODO: there really should be a better way to do this (but apparently there isn't?)
             s = get_circle(color, radius, screen, blur)
             if self.magic:
-              x = self.magic.world.view.pl2sc_x(dot.pos) + dot.x - radius
-              y = self.magic.world.view.sc_h() - dot.hover + dot.y - radius
+              x = self.magic.world.view.pl2sc_x(dot.pos) + dot.x - radius - blur
+              y = self.magic.world.view.sc_h() - dot.hover + dot.y - radius - blur
               screen.blit(s, (x, y))
             else:
-              screen.blit(s, (dot.x + self.xofs - radius, 100 + dot.y - radius))
+              screen.blit(s, (dot.x + self.xofs - radius - blur, 100 + dot.y - radius - blur))
 
 # A template
 class Dummy(ParticleEffect):
