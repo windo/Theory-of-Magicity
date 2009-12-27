@@ -139,7 +139,7 @@ class MagicParticle(actors.Actor):
 
       # particle params (position, normal distribution params) for field calculation
       def get_params(self):
-          return [self.pos, self.dev, self.mult / self.coeff]
+          return [self.pos, self.dev, self.mult / self.base_coeff]
 
       def destroy(self):
           # no more field effects

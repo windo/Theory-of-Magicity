@@ -1010,6 +1010,9 @@ class HunterController(FSMController):
 
           elif self.state == "heal":
             if self.state_time() > 10.0 or self.puppet.hp > self.puppet.initial_hp * 0.9:
+              if self.shot:
+                self.puppet.magic.release(self.shot)
+                self.shot = False
               self.set_state("idle")
 
       def state_action(self):

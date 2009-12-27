@@ -33,6 +33,12 @@ class ResourceLoader:
           self.textfont  = pygame.font.Font("font/angltrr.ttf", 20)
           self.debugfont = pygame.font.Font("font/freesansbold.ttf", 16)
 
+          # scaling function
+          if hasattr(pygame.transform, "smoothscale"):
+            self.scale = pygame.transform.smoothscale
+          else:
+            self.scale = pygame.transform.scale
+
           # load sprites
           self.sprite("fire", "fireball", 25, resize = (50, 50))
           self.sprite("ice", "iceball", 25, resize = (50, 50))
@@ -79,8 +85,7 @@ class ResourceLoader:
               if flip:
                 img = pygame.transform.flip(img, True, False)
               if resize:
-                # TODO: newer pygame could use smoothscale
-                img = pygame.transform.scale(img, resize)
+                img = self.scale(img, resize)
               img = img.convert_alpha(self.screen)
               self.spritelists[listname] = [img]
             else:
@@ -94,7 +99,7 @@ class ResourceLoader:
                 if flip:
                   subimg = pygame.transform.flip(subimg, True, False)
                 if resize:
-                  subimg = pygame.transform.scale(subimg, resize)
+                  subimg = self.scale(subimg, resize)
                 # TODO: does this help at all?
                 subimg = subimg.convert_alpha(self.screen)
                 self.spritelists[listname].append(subimg)
@@ -475,10 +480,10 @@ class Game:
           # performance debugging stats
           update_time         = 0
           update_actors_time  = 0
+          update_magic_time   = 0
           update_story_time   = 0
           update_display_time = 0
           draw_time        = 0
-          draw_bg_time     = 0
           draw_fields_time = 0
           sort_time        = 0
           draw_actors_time = 0
@@ -503,9 +508,16 @@ class Game:
             update_stime = actors_stime = time.time()
             # actors moving
             if not world.paused():
-              for actor in world.all_actors():
+              for actor in world.get_actors(exclude = [fields.MagicParticle]):
                 actor.update()
             update_actors_time = time.time() - actors_stime
+
+            magic_stime = time.time()
+            # magic moving
+            if not world.paused():
+              for actor in world.get_actors(include = [fields.MagicParticle]):
+                actor.update()
+            update_magic_time = time.time() - magic_stime
 
             # storyline evolving
             story_stime = time.time()
@@ -559,13 +571,13 @@ class Game:
             if draw_debug:
               if int(time.time()) != lasttime or not fps_img:
                 fps_txt        = "FPS: %.1f" % (fps)
-                draw_times_txt = "DRAW=%.3f (bg=%.3f fields=%.3f sort=%.3f actors=%.3f magic=%.3f misc=%.3f)" % \
-                                 (draw_time * 1000, draw_bg_time * 1000, draw_fields_time * 1000, sort_time * 1000,
+                draw_times_txt = "DRAW=%.3f (fields=%.3f sort=%.3f actors=%.3f magic=%.3f misc=%.3f)" % \
+                                 (draw_time * 1000, draw_fields_time * 1000, sort_time * 1000,
                                  draw_actors_time * 1000, draw_magic_time * 1000, draw_misc_time * 1000)
-                update_times_txt = "Actors=%u, cch=%u, ccm=%u UPDATE=%.3f (actors=%.3f story=%.3f) display.update=%.3f" % \
-                                   (len(world.all_actors()), effects.circle_cache_hit, effects.circle_cache_miss,
-                                   update_time * 1000, update_actors_time * 1000,
-                                    update_story_time * 1000, update_display_time * 1000)
+                update_times_txt = "UPDATE=%.3f (actors=%.3f magic=%.3f story=%.3f) display.update=%.3f actors=%u, cch=%u, ccm=%u" % \
+                                   (update_time * 1000, update_actors_time * 1000, update_magic_time * 1000,
+                                    update_story_time * 1000, update_display_time * 1000,
+                                    len(world.all_actors()), effects.circle_cache_hit, effects.circle_cache_miss)
                 font         = world.loader.debugfont
                 color        = (255, 255, 255)
                 fps_img      = font.render(fps_txt, True, color)

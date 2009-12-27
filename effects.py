@@ -6,7 +6,7 @@ from random import random
 global circle_cache, circle_cache_hit, circle_cache_miss
 circle_cache = {}
 circle_cache_hit = circle_cache_miss = 0
-def get_circle(color, radius, screen = False):
+def get_circle(color, radius, screen = False, blur = 0):
     global circle_cache, circle_cache_hit, circle_cache_miss
     # color accuracy
     c = []
@@ -14,19 +14,48 @@ def get_circle(color, radius, screen = False):
       c.append(min(round(color[i] / 8) * 8, 255))
     color = tuple(c)
     # radius accuracy
-    radius = round(radius)
+    radius = int(round(radius))
+    blur   = int(blur)
 
     # try to get it from cache
-    if circle_cache.has_key((color, radius)):
+    if circle_cache.has_key((color, radius, blur)):
       circle_cache_hit += 1
-      return circle_cache[(color, radius)]
+      return circle_cache[(color, radius, blur)]
     else:
       circle_cache_miss += 1
-      s = pygame.surface.Surface((radius * 2, radius * 2), pygame.SRCALPHA, 32)
-      pygame.draw.circle(s, color, (radius, radius), radius, 0)
+      s = pygame.surface.Surface(((radius + blur) * 2, (radius + blur) * 2), pygame.SRCALPHA, 32)
+      # 0-alpha background
+      s.fill(color[:3] + (0,))
+      # circle (or many, for "blur")
+      pygame.draw.circle(s, color, (radius + blur, radius + blur), radius, 0)
+
+      # blur the edges of the circle (just set the alpha)
+      if blur:
+        alphas = pygame.surfarray.pixels_alpha(s)
+        color_alpha = color[3]
+        center = radius + blur
+        for y in xrange(radius + blur):
+          for x in xrange(radius + blur):
+            if x + y < radius:
+              pass
+            dist = ((x - center) ** 2 + (y - center) ** 2) ** 0.5
+            if dist < radius:
+              pass
+            elif dist > radius + blur:
+              pass
+            else:
+              alpha = (blur - (dist - radius)) / (blur + 1) * color_alpha
+              alphas[y][x] = alpha
+              alphas[2 * center - 1 - y][x] = alpha
+              alphas[y][2 * center - 1 - x] = alpha
+              alphas[2 * center - 1 - y][2 * center - 1 - x] = alpha
+
+      # optimize for screen
       if screen:
         s = s.convert_alpha(screen)
-      circle_cache[(color, radius)] = s
+
+      # save to cache
+      circle_cache[(color, radius, blur)] = s
       return s
 
 class Dot:
@@ -88,9 +117,9 @@ class ParticleEffect:
       def draw(self, screen, draw_debug = False):
           for dot in self.dots:
             color  = self.get_color(dot)
-            radius = self.get_radius(dot)
+            radius, blur = self.get_radius(dot)
             # TODO: there really should be a better way to do this (but apparently there isn't?)
-            s = get_circle(color, radius, screen)
+            s = get_circle(color, radius, screen, blur)
             if self.magic:
               x = self.magic.world.view.pl2sc_x(dot.pos) + dot.x - radius
               y = self.magic.world.view.sc_h() - dot.hover + dot.y - radius
@@ -103,7 +132,7 @@ class Dummy(ParticleEffect):
       def gen_dot(self):
           return Dot(0, 0, 0, 0)
       def get_radius(self, dot):
-          return 1
+          return 1, 0
       def get_color(self, dot):
           return (0, 0, 0, 0)
       def update_speed(self, dot, timediff):
@@ -157,9 +186,9 @@ class Fire(ParticleEffect):
           return Dot(x, y, xs, ys)
       def get_radius(self, dot):
           if dot.age < 0.1:
-            return 5.0
+            return 4.0, 1.0
           else:
-            return min(3 + dot.age ** 2 * 3.0, 20)
+            return min(3 + dot.age ** 2 * 3.0, 20), 3.0
       def get_color(self, dot):
           return self.firegradient.get_color(dot.age)
       def update_speed(self, dot, timediff):
@@ -183,9 +212,9 @@ class Nature(ParticleEffect):
       def gen_dot(self):
           dot = Dot(random() * 10 - 5, random() * 25.0, random() * 2.0 - 1.0, 5.0 + random() * 1.0)
           if random() < 0.5:
-            dot.radius = 1.0
+            dot.radius = 1.0, 0.0
           else:
-            dot.radius = 5.0
+            dot.radius = 3.0, 2.0
           dot.seed = random() * 100.0
           return dot
       def get_radius(self, dot):
@@ -207,9 +236,9 @@ class Wind(ParticleEffect):
           dot = Dot(x, y, 0, 0)
           dot.seed = random() * 100.0
           if random() < 0.8:
-            dot.radius = 1
+            dot.radius = 1, 0
           else:
-            dot.radius = 2
+            dot.radius = 2, 2
           return dot
       def get_radius(self, dot):
           return dot.radius
@@ -234,7 +263,7 @@ class Energy(ParticleEffect):
             dot.color = (32 + light, 32 + light, 255 - random() * 96, 32)
           return dot
       def get_radius(self, dot):
-          return math.sin(6 * dot.age + dot.xseed) * 5.0 + 5.0
+          return math.sin(6 * dot.age + dot.xseed) * 5.0 + 5.0, 3.0
       def get_color(self, dot):
           return dot.color
       def update_speed(self, dot, timediff):
