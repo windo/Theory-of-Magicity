@@ -188,7 +188,7 @@ class Fire(ParticleEffect):
           if dot.age < 0.1:
             return 4.0, 1.0
           else:
-            return min(3 + dot.age ** 2 * 3.0, 20), 3.0
+            return min(3 + dot.age ** 2 * 3.0, 20), 2.0
       def get_color(self, dot):
           return self.firegradient.get_color(dot.age)
       def update_speed(self, dot, timediff):

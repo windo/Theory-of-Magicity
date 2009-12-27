@@ -165,7 +165,7 @@ class Shepherd(Story):
           # player-controlled object
           self.dude = world.new_actor(actors.Dude, 75.0)
 
-          world.view.goto(-100.0)
+          world.view.goto(-50.0)
           world.view.follow(self.dude, pan = True)
 
       def player(self):
@@ -349,7 +349,7 @@ class Massacre(Story):
           # player-controlled object
           self.dude = world.new_actor(actors.Dude, 10)
 
-          world.view.goto(250.0)
+          world.view.goto(150.0)
           world.view.follow(self.dude, pan = True)
 
       def player(self):
@@ -573,13 +573,13 @@ class Siege(Story):
 
           # enemies
           for i in xrange(5):
-            dragon = world.new_actor(actors.HuntingDragon, random() * 50.0)
+            dragon = world.new_actor(actors.HuntingDragon, random() * 75.0)
             dragon.controller.set_waypoint(50)
 
           # friends
           self.guardpost = []
           for i in xrange(4):
-            villager = world.new_actor(actors.HuntingVillager,  100 - random() * 50.0)
+            villager = world.new_actor(actors.HuntingVillager,  150 - random() * 75.0)
             villager.controller.set_waypoint(50)
             self.guardpost.append(villager)
 
