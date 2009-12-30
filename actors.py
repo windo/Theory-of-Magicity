@@ -498,6 +498,14 @@ class Background(Drawable):
 
 class BackgroundHills(Background):
       sprite_names = ["hills"]
+class ForegroundGrass(Background):
+      distance = 1
+      stacking = 30
+      sprite_names  = ["grass"]
+class ForegroundOldGrass(Background):
+      distance = 0.8
+      stacking = 31
+      sprite_names  = ["oldbiggrass"]
 
 # swarming demo
 class Bird(Actor):

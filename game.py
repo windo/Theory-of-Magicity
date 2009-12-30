@@ -40,10 +40,6 @@ class ResourceLoader:
             self.scale = pygame.transform.scale
 
           # load sprites
-          self.sprite("fire", "fireball", 25, resize = (50, 50))
-          self.sprite("ice", "iceball", 25, resize = (50, 50))
-          self.sprite("ashes", "ashes", 100, resize = (50, 50))
-          
           self.sprite("dude_svg", "dude-right", 100, resize = (50, 200))
           self.sprite("dude_svg", "dude-left", 100, flip = True, resize = (50, 200))
           self.sprite("villager", "villager-right", 100, resize = (50, 200))
@@ -67,6 +63,8 @@ class ResourceLoader:
           self.sprite("hut", "hut")
 
           self.sprite("hills", "hills")
+          self.sprite("grass", "grass")
+          self.sprite("oldbiggrass", "oldbiggrass")
 
           # load sounds
           self.sounds(["cry", "cape1", "cape2", "step"])

@@ -21,6 +21,8 @@ class Story:
           """
           world = self.world
           world.new_actor(actors.BackgroundHills, 0)
+          world.new_actor(actors.ForegroundGrass, 0)
+          world.new_actor(actors.ForegroundOldGrass, 0)
           # paint some scenery
           for i in xrange(10):
             world.new_actor(actors.Tree, -250 + (500 / 10) * i + random() * 25)
