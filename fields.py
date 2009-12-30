@@ -50,7 +50,7 @@ class MagicField:
               # color of the line segment
               alpha = min(192, abs(value) * 256 * 8)
               color = self.color + (alpha,)
-              s = effects.get_circle(color, min(3, abs(value) * 100, screen))
+              s = effects.get_circle(color, 2, screen, min(3, abs(value) * 100))
               screen.blit(s, (pos, ypos))
               if draw_debug and i % (self.drawpoints / 5) == 0:
                 at  = view.sc2pl_x(pos)
@@ -196,8 +196,8 @@ class MagicParticle(actors.Actor):
           radius = 25
           x      = self.world.view.pl2sc_x(self.pos)
           y      = self.world.view.sc_h() - self.hover_height
-          s = effects.get_circle((255, 255, 255, 32), radius, screen)
-          screen.blit(s, (x - radius, y - radius))
+          s = effects.get_circle((255, 255, 255, 32), radius, screen, blur = 5)
+          screen.blit(s, (x - radius - 5, y - radius - 5))
 
           # draw field effects
           for fx in self.particle_effects:
