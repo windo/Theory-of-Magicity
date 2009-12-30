@@ -32,6 +32,7 @@ class Drawable:
 
       def __init__(self, world, pos):
           self.world  = world
+          self.id     = world.next_actor_id()
           # movement params
           self.pos    = pos
           self.speed  = 0.0
@@ -73,7 +74,7 @@ class Drawable:
 
       # used for drawing debug information - may overload to add more information
       def __str__(self):
-          return "%s(0x%s)" % (str(self.__class__).split(".")[1], id(self))
+          return "%s(%u)" % (str(self.__class__).split(".")[1], self.id)
       def debug_info(self):
           return "%s pos=(%.1f, %.1f) speed=(%.1f, %.1f)" % (str(self), self.pos, self.ypos, self.speed, self.yspeed)
 
@@ -180,8 +181,8 @@ class Actor(Drawable):
       control          = None
       control_interval = 0.05
 
-      def __init__(self, world, pos):
-          Drawable.__init__(self, world, pos)
+      def __init__(self, *args):
+          Drawable.__init__(self, *args)
 
           # field references for convenience
           self.TimeField = self.world.get_field(fields.TimeField)
@@ -189,8 +190,8 @@ class Actor(Drawable):
           self.LifeField = self.world.get_field(fields.LifeField)
 
           # actor clock, used to calibrate movement/damage/etc during update
-          self.last_update  = world.get_time()
-          self.last_control = world.get_time()
+          self.last_update  = self.world.get_time()
+          self.last_control = self.world.get_time()
           self.timediff     = 0.0
 
           # used to throttle movement sound effects
@@ -932,7 +933,7 @@ class HunterController(FSMController):
             target_pos = self.target.pos
           else:
             target_pos = 0
-          return "%s target=%s (%3f) waypoint=%3f" % \
+          return "%s target=%s (%.1f) waypoint=%.1f" % \
                  (FSMController.debug_info(self), self.target, target_pos, self.waypoint)
       def set_waypoint(self, waypoint):
           self.waypoint = waypoint

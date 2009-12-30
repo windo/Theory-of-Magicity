@@ -266,7 +266,8 @@ class World:
           for fieldtype in fieldtypes:
             field = fieldtype(loader)
             self.fields[fieldtype] = field
-          self.actors  = []
+          self.actors   = []
+          self.actor_id = 0
 
       def get_time(self):
           if self.pause_start:
@@ -286,6 +287,10 @@ class World:
             return False
 
       # actor management
+      def next_actor_id(self):
+          id = self.actor_id
+          self.actor_id += 1
+          return id
       def new_actor(self, actor_class, pos):
           actor = actor_class(self, pos)
           self.actors.append(actor)
