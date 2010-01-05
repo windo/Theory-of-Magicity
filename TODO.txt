@@ -5,7 +5,16 @@ Stuff to do, in order:
  * further camera improvements - less switching during turing
   * not so jumpy
   * delayed speed estimation?
+ * WimpyController hpdiff * timediff is wrong (controller timediff != puppet.timediff)
+ * BehaviourController
  * more levels?
+  * Anger the Dragons - defeat an elusive dragonfly
+  * Through the Bush  - way back home with friends, more resourceful enemies
+  * Roast the Lady    - at homecamp, outsmart the Lady Dragon
+ * final performance tuning - with the lousier laptop
+  * potentially way to turn off some "eye candy" ;)
+ * update web page
+ * add youtube trailer
 
 Ideas:
  * implement "visual" magic

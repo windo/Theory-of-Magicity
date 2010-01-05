@@ -1,12 +1,16 @@
 #!/usr/bin/python
 
+import cProfile
+
 import time, sys, math
 from random import random
 from operator import attrgetter
 
+# pygame
 import pygame
 from pygame.locals import *
 
+# game libraries
 import actors, fields, stories, effects
 
 class ResourceLoader:
@@ -353,7 +357,9 @@ class Game:
 
           # screen params
           screensize  = (1024, 768)
-          self.screen = pygame.display.set_mode(screensize, pygame.FULLSCREEN)
+          flags       = FULLSCREEN
+          #flags       = FULLSCREEN | HWSURFACE | DOUBLEBUF
+          self.screen = pygame.display.set_mode(screensize, flags)
           #screensize  = (800, 600)
           #self.screen = pygame.display.set_mode(screensize)
           self.view   = View(screensize, (0, 100, 0, 50))
@@ -414,19 +420,19 @@ class Game:
 
             # events
             for event in pygame.event.get():
-              if event.type == pygame.QUIT:
+              if event.type == QUIT:
                 forever = False
 
-              if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+              if event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
                   forever = False
 
-                elif event.key == pygame.K_UP:
+                elif event.key == K_UP:
                   select -= 1
-                elif event.key == pygame.K_DOWN:
+                elif event.key == K_DOWN:
                   select += 1
 
-                elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                elif event.key == K_RETURN or event.key == K_SPACE:
                   item = menu[select]
                   if item["action"] == "exit":
                     forever = False
@@ -435,7 +441,7 @@ class Game:
                     self.run_story(item["action"])
                   self.set_music("happytheme")
 
-              elif event.type == pygame.MOUSEBUTTONDOWN:
+              elif event.type == MOUSEBUTTONDOWN:
                 if event.button == 1:
                   item = menu[select]
                   if item["action"] == "exit":
@@ -444,7 +450,7 @@ class Game:
                     self.set_music(item["music"])
                     self.run_story(item["action"])
                   self.set_music("happytheme")
-              elif event.type == pygame.MOUSEMOTION:
+              elif event.type == MOUSEMOTION:
                 x, y = event.pos
                 center = self.view.sc_w() / 2
                 for item in menu:
@@ -613,64 +619,64 @@ class Game:
           
             ## handle events
             for event in pygame.event.get():
-              if event.type == pygame.QUIT:
+              if event.type == QUIT:
                 forever = False
               
               ## keyboard
               # key events
-              if event.type == pygame.KEYDOWN:
+              if event.type == KEYDOWN:
                 # misc
-                if event.key == pygame.K_ESCAPE:
+                if event.key == K_ESCAPE:
                   forever = False
-                if event.key == pygame.K_p:
+                if event.key == K_p:
                   world.pause()
           
                 # player moving
-                elif event.key == pygame.K_LEFT:
+                elif event.key == K_LEFT:
                   player.move_left()
-                elif event.key == pygame.K_RIGHT:
+                elif event.key == K_RIGHT:
                   player.move_right()
                 # mouse_mode player moving
-                elif mouse_mode and event.key == pygame.K_a:
+                elif mouse_mode and event.key == K_a:
                   player.move_left()
-                elif mouse_mode and event.key == pygame.K_d:
+                elif mouse_mode and event.key == K_d:
                   player.move_right()
 
                 # explicit camera control
-                elif event.key == pygame.K_j:
+                elif event.key == K_j:
                   view.follow(False)
                   view.move_x(-10.0)
-                elif event.key == pygame.K_k:
+                elif event.key == K_k:
                   view.follow(player)
-                elif event.key == pygame.K_l:
+                elif event.key == K_l:
                   view.follow(False)
                   view.move_x(+10.0)
           
                 # mode switching
-                elif event.key == pygame.K_TAB:
+                elif event.key == K_TAB:
                   draw_debug = not draw_debug
-                elif event.key == pygame.K_LCTRL or event.key == pygame.K_RCTRL:
+                elif event.key == K_LCTRL or event.key == K_RCTRL:
                   get_magic  = True
                   if sel_magic:
                     sel_magic.selected = False
                     sel_magic = False
-                elif event.key == pygame.K_m:
+                elif event.key == K_m:
                   mouse_mode = not mouse_mode
                 
                 # cast magic balls
-                elif event.key == pygame.K_z:
+                elif event.key == K_z:
                   if sel_magic:
                     sel_magic.selected = False
                   sel_magic = player.magic.new(fields.TimeBall)
                   sel_magic.selected = True
                   casting = False
-                elif event.key == pygame.K_x:
+                elif event.key == K_x:
                   if sel_magic:
                     sel_magic.selected = False
                   sel_magic = player.magic.new(fields.WindBall)
                   sel_magic.selected = True
                   casting = False
-                elif event.key == pygame.K_c:
+                elif event.key == K_c:
                   if sel_magic:
                     sel_magic.selected = False
                   sel_magic = player.magic.new(fields.LifeBall)
@@ -678,15 +684,15 @@ class Game:
                   casting = False
 
                 # recapture existing particles
-                elif get_magic and event.key >= pygame.K_1 and event.key <= pygame.K_9:
-                  idx = event.key - pygame.K_1
+                elif get_magic and event.key >= K_1 and event.key <= K_9:
+                  idx = event.key - K_1
                   if len(local_balls) > idx:
                     if sel_magic:
                       sel_magic.selected = False
                     sel_magic = local_balls[idx]
                     sel_magic.selected = True
                     player.magic.capture(sel_magic)
-                elif get_magic and (event.key == pygame.K_a or event.key == pygame.K_d):
+                elif get_magic and (event.key == K_a or event.key == K_d):
                   # select ball with arrow keys
                   if sel_magic:
                     refpos = sel_magic.pos
@@ -695,10 +701,10 @@ class Game:
                   # look for ball in right direction
                   captured_ball = False
                   for ball in local_balls:
-                    if event.key == pygame.K_a:
+                    if event.key == K_a:
                       if ball.pos < refpos:
                         captured_ball = ball
-                    elif event.key == pygame.K_d:
+                    elif event.key == K_d:
                       if ball.pos > refpos:
                         captured_ball = ball
                         break
@@ -710,51 +716,51 @@ class Game:
                     player.magic.capture(sel_magic)
 
                 # magic moving
-                elif sel_magic and event.key == pygame.K_a:
+                elif sel_magic and event.key == K_a:
                   player.magic.move(sel_magic, diff = -3.0)
-                elif sel_magic and event.key == pygame.K_d:
+                elif sel_magic and event.key == K_d:
                   player.magic.move(sel_magic, diff = 3.0)
-                elif sel_magic and event.key == pygame.K_w:
+                elif sel_magic and event.key == K_w:
                   player.magic.power(sel_magic, diff = 3.0)
-                elif sel_magic and event.key == pygame.K_s:
+                elif sel_magic and event.key == K_s:
                   player.magic.power(sel_magic, diff = -3.0)
 
                 # release magic
-                elif sel_magic and event.key == pygame.K_r:
+                elif sel_magic and event.key == K_r:
                   if sel_magic:
                     player.magic.release(sel_magic)
                     sel_magic.selected = False
                     sel_magic = False
-                elif event.key == pygame.K_r:
+                elif event.key == K_r:
                   player.magic.release_all()
                   if sel_magic:
                     sel_magic.selected = False
                     sel_magic = False
 
               # key releases
-              elif event.type == pygame.KEYUP:
+              elif event.type == KEYUP:
                 # movement
-                if event.key == pygame.K_LEFT:
+                if event.key == K_LEFT:
                   player.stop()
-                elif event.key == pygame.K_RIGHT:
+                elif event.key == K_RIGHT:
                   player.stop()
-                elif mouse_mode and event.key == pygame.K_a:
+                elif mouse_mode and event.key == K_a:
                   player.stop()
-                elif mouse_mode and event.key == pygame.K_d:
+                elif mouse_mode and event.key == K_d:
                   player.stop()
 
                 # magic movement
-                elif sel_magic and event.key == pygame.K_a:
+                elif sel_magic and event.key == K_a:
                   player.magic.move(sel_magic, 0.0)
-                elif sel_magic and event.key == pygame.K_d:
+                elif sel_magic and event.key == K_d:
                   player.magic.move(sel_magic, 0.0)
 
                 # input modes
-                elif event.key == pygame.K_LCTRL or event.key == pygame.K_RCTRL:
+                elif event.key == K_LCTRL or event.key == K_RCTRL:
                   get_magic = False
 
               ## mouse
-              elif event.type == pygame.MOUSEBUTTONDOWN:
+              elif event.type == MOUSEBUTTONDOWN:
                 if event.button == 1:
                   pos = view.sc2pl_x(event.pos[0])
                   particles = world.get_actors(pos - 5, pos + 5, include = [fields.MagicParticle])
@@ -779,21 +785,21 @@ class Game:
                 elif event.button == 2:
                   pass
 
-              elif event.type == pygame.MOUSEBUTTONUP:
+              elif event.type == MOUSEBUTTONUP:
                 if event.button == 1:
                   mouse_control = False
                   pygame.mouse.set_visible(True)
                   if sel_magic:
                     player.magic.move(sel_magic, 0)
 
-              elif event.type == pygame.MOUSEMOTION and mouse_control and sel_magic:
+              elif event.type == MOUSEMOTION and mouse_control and sel_magic:
                 x, y = event.rel
                 player.magic.move(sel_magic, diff = x / 2)
                 player.magic.power(sel_magic, diff = -y / 2)
                 
           
             # calibration
-            self.clock.tick(45)
+            self.clock.tick(50)
             frames += 1
             if int(time.time()) != lasttime:
               fps = (frames - lastframes)
@@ -802,4 +808,5 @@ class Game:
           
 if __name__ == "__main__":
    g = Game()
+   #cProfile.run("g.title_screen()", "game.stats")
    g.title_screen()

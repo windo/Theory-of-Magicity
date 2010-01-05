@@ -7,8 +7,11 @@ class MagicField:
       An abstract magic field, currently consisting of
       normal distribution "particles"
       """
-      # granularity of drawing the field
-      drawpoints = 150
+      # step for drawing the field
+      draw_real_points = 50
+      # extra points to interpolate
+      interpolate = 2
+      # field base value - currently nothing changes this
       basevalue  = 0.0
 
       def __init__(self, loader):
@@ -18,8 +21,6 @@ class MagicField:
       # could be overloaded
       def value(self, pos):
           v = self.particle_values(pos)
-          #if abs(v) > 0.2:
-          #  print (pos, v)
           return v
 
       # add a new normal distribution
@@ -40,23 +41,33 @@ class MagicField:
       # Get the field's value at pos as translated through the view
       def draw(self, view, screen, draw_debug = False):
           # step should be float to cover the whole range
-          step = float(view.sc_w()) / float(self.drawpoints)
-          for i in xrange(self.drawpoints):
-            pos   = i * step
-            value = self.value(view.sc2pl_x(pos))
-            ypos  = view.sc_h() - (value + 1.0) * view.sc_h() / 2.0
-            # draw
-            if abs(value) > 0.01:
-              # color of the line segment
-              alpha = min(192, abs(value) * 256 * 8)
-              color = self.color + (alpha,)
-              s = effects.get_circle(color, 2, screen, min(3, abs(value) * 100))
-              screen.blit(s, (pos, ypos))
-              if draw_debug and i % (self.drawpoints / 5) == 0:
-                at  = view.sc2pl_x(pos)
-                txt = "%s.value(%.2f:%.2f) = %.2f" % (str(self.__class__).split(".")[1], i, at, value)
-                txt = self.loader.debugfont.render(txt, True, (255, 255, 255))
-                screen.blit(txt, (pos, ypos))
+          step = float(view.sc_w()) / float(self.draw_real_points)
+          cur  = self.value(view.sc2pl_x(0))
+          for i in xrange(self.draw_real_points):
+            i   += 1
+            pos  = i * step
+            next = self.value(view.sc2pl_x(pos))
+            for j in xrange(self.interpolate):
+              value = cur + (next - cur) / self.interpolate * j
+              # draw
+              if abs(value) > 0.01:
+                # color of the line segment
+                alpha = min(192, abs(value) * 256 * 8)
+                color = self.color + (alpha,)
+                s = effects.get_circle(color, min(5, abs(value) * 100), screen, 3)
+                ypos = view.sc_h() - (value + 1.0) * view.sc_h() / 2.0
+                screen.blit(s, (pos - step + j * step / self.interpolate, ypos))
+
+            # draw debug
+            if draw_debug and i % (self.draw_real_points / 5) == 0 and abs(cur) > 0.01:
+              at  = view.sc2pl_x(pos)
+              txt = "%s.value(%.2f:%.2f) = %.2f" % (str(self.__class__).split(".")[1], i, at, next)
+              txt = self.loader.debugfont.render(txt, True, (255, 255, 255))
+              ypos = view.sc_h() - (next + 1.0) * view.sc_h() / 2.0
+              screen.blit(txt, (pos, ypos))
+
+            # next interpolation
+            cur = next
 
 # Time
 # affects: speed < health regen? > vision
@@ -193,11 +204,11 @@ class MagicParticle(actors.Actor):
       def draw(self, screen, draw_debug = False):
           actors.Actor.draw(self, screen, draw_debug)
           # draw magic "ball"
-          radius = 25
+          radius = 25 
           x      = self.world.view.pl2sc_x(self.pos)
           y      = self.world.view.sc_h() - self.hover_height
-          s = effects.get_circle((255, 255, 255, 32), radius, screen, blur = 5)
-          screen.blit(s, (x - radius - 5, y - radius - 5))
+          s = effects.get_circle((255, 255, 255, 64), radius, screen, blur = 15)
+          screen.blit(s, (x - radius, y - radius))
 
           # draw field effects
           for fx in self.particle_effects:
@@ -209,7 +220,7 @@ class MagicParticle(actors.Actor):
             s = effects.get_circle((255, 255, 255, 16), radius, screen)
             screen.blit(s, (x - radius, y - radius))
             # affects
-            s = effects.get_circle((255, 255, 255, 64), 5, screen)
+            s = effects.get_circle((255, 255, 255, 64), 5, screen, 2)
             for caster in self.affects:
               accel, mult = caster.affect_particle(self)
               for i in xrange(5):

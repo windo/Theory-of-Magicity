@@ -179,7 +179,6 @@ class Actor(Drawable):
       
       # controller class (state machine or other)
       control          = None
-      control_interval = 0.05
 
       def __init__(self, *args):
           Drawable.__init__(self, *args)
@@ -322,7 +321,7 @@ class Actor(Drawable):
           
           # controlled actors most likely want to do something
           if self.controller:
-            if self.last_control + self.control_interval < self.world.get_time():
+            if self.last_control + self.controller.control_interval < self.world.get_time():
               self.controller.update()
               self.last_control = self.world.get_time()
       
@@ -569,6 +568,10 @@ class Guardian(Character):
 
 # controllers
 class Controller:
+      """
+      An actor may have a controller that moves it around
+      """
+      control_interval = 0.1
       def __init__(self, puppet):
           self.puppet = puppet
       def __str__(self):
@@ -579,6 +582,11 @@ class Controller:
           pass
 
 class FlyingController(Controller):
+      """
+      A controller for the birds flying around in background.
+      The different birds just need to implement the decision where to fly.
+      """
+      control_interval = 0.2
       def __init__(self, *args):
           Controller.__init__(self, *args)
           self.xdiff = self.ydiff = 0.0
@@ -602,10 +610,13 @@ class FlyingController(Controller):
           return x, y
 
       def find_offset(self):
+          """
+          Must be overloaded to set up self.xdiff and self.ydiff
+          to direct towards the destination where to fly
+          """
           pass
 
       def update(self):
-          # where to fly?
           self.find_offset()
 
           # face left/right
@@ -624,6 +635,12 @@ class FlyingController(Controller):
           self.puppet.yspeed = y
 
 class BirdFlocker(FlyingController):
+      """
+      A controller that attempts to fly around randomly prefering to keep
+      together in flocks.
+      
+      When a predator brid approaches, the primary goal is to escape it.
+      """
       def __init__(self, *args):
           FlyingController.__init__(self, *args)
           ## flocking params
@@ -663,8 +680,10 @@ class BirdFlocker(FlyingController):
           if self.puppet.ypos > self.ypos_upper_bound:
             self.ydiff -= self.weight_bounds
 
+          vis_start = self.puppet.pos - self.visible_dist
+          vis_end   = self.puppet.pos + self.visible_dist
           # predators
-          preds = self.puppet.world.get_actors(include = [BigBird])
+          preds = self.puppet.world.get_actors(vis_start, vis_end, include = [BigBird])
           pred_xdiff = pred_ydiff = 0.0
           for pred in preds:
             xdiff = pred.pos - self.puppet.pos
@@ -679,7 +698,7 @@ class BirdFlocker(FlyingController):
             self.ydiff += y
 
           # find other birds
-          neighs = self.puppet.world.get_actors(include = [SmallBird])
+          neighs = self.puppet.world.get_actors(vis_start, vis_end, include = [SmallBird])
           # flocking
           flock_xdiff = flock_ydiff = 0.0
           for neigh in neighs:
@@ -713,6 +732,9 @@ class BirdFlocker(FlyingController):
             self.random_waypoint()
 
 class BirdPredator(FlyingController):
+      """
+      Pick a random small bird and fly towards it
+      """
       def __init__(self, *args):
           FlyingController.__init__(self, *args)
           self.random_target()
@@ -731,6 +753,9 @@ class BirdPredator(FlyingController):
             self.random_target()
 
 class FSMController(Controller):
+      """
+      Container for finite state machines
+      """
       states = [ "idle" ]
       start_state = "idle"
 
@@ -769,11 +794,21 @@ class FSMController(Controller):
           self.state_change()
           self.state_action()
       def state_change(self):
+          """
+          Must be overloaded to switch states as neccessary
+          """
           pass
       def state_action(self):
+          """
+          Must be overloaded to take action based on the state
+          """
           pass
 
 class GuardianController(FSMController):
+      """
+      Block the movement of actors in self.danger with Time magic.
+      If there is a waypoint, move to it abandoning the blocking action.
+      """
       states = [ "idle", "guarding", "walking" ]
       danger = [ Dragon ]
       def __init__(self, puppet):
@@ -881,8 +916,11 @@ class GuardianController(FSMController):
                 self.puppet.stop()
                 self.waypoint = False
 
-
 class WimpyController(FSMController):
+      """
+      Indended for rabbits. Run around randomly (slowly drifting towards waypoint).
+      If HP decreases fast enough, flee in the other direction.
+      """
       states   = [ "idle", "flee" ]
 
       def __init__(self, *args):
@@ -929,6 +967,11 @@ class WimpyController(FSMController):
                 self.puppet.move_right()
 
 class HunterController(FSMController):
+      """
+      Hunt actors in self.puppet.prey.
+      Try to keep appropriate distance, fire Life magic balls, evade nearby
+      balls and heal self with Life magic.
+      """
       states = [ "idle", "follow", "shoot", "evade", "heal" ]
       def __init__(self, puppet):
           FSMController.__init__(self, puppet)
@@ -1093,6 +1136,13 @@ class HunterController(FSMController):
               self.puppet.magic.move(self.shot, 1.0)
             else:
               self.puppet.magic.move(self.shot, -1.0)
+
+class BehaviourPlanner(Controller):
+      """
+      Container for behaviour planning controller
+      """
+      def __init__(self, *args):
+          Controller.__init__(self, *args)
 
 class HuntingDragon(Dragon):
       control = HunterController
