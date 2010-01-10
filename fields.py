@@ -238,6 +238,7 @@ class WindBall(MagicParticle):
       sprite_names = []
       effectors    = [ effects.Wind ]
       fieldtype    = WindField
+      snd_move     = ["wind1", "wind2", "wind3"]
 class LifeBall(MagicParticle):
       sprite_names = []
       effectors    = [ effects.Fire, effects.Nature ]

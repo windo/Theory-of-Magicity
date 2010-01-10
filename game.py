@@ -74,6 +74,7 @@ class ResourceLoader:
           self.sounds(["cry", "cape1", "cape2", "step"])
           self.sounds(["beep1", "beep2", "jump"])
           self.sounds(["moan1", "moan2", "crackle1", "crackle2"])
+          self.sounds(["wind1", "wind2", "wind3"], volume = 0.01)
 
       def sprite(self, name, listname = False, width = False, start = 0, to = False, flip = False, resize = False):
           # load the file, if not already loaded
@@ -117,12 +118,13 @@ class ResourceLoader:
           else:
             raise self.NoImage(name)
 
-      def sounds(self, load_sounds):
+      def sounds(self, load_sounds, volume = 1.0):
           for load_sound in load_sounds:
-            self.sound(load_sound)
-      def sound(self, name):
+            self.sound(load_sound, volume)
+      def sound(self, name, volume = 1.0):
           if not self.soundlist.has_key(name):
             snd = pygame.mixer.Sound("sound/%s.ogg" % (name))
+            snd.set_volume(volume)
             self.soundlist[name] = snd
       def play_sound(self, name):
           self.soundlist[name].play()
