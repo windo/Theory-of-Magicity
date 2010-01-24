@@ -1,35 +1,46 @@
 <html>
+
 <head>
 <title>Theory of Magicity</title>
+<style type="text/css">
+td, th {
+        background-color: #eee;
+        border-style: solid;
+        border-width: 1px;
+}
+</style>
 </head>
-<body>
 
+<body>
 <h3>Theory of Magicity</h3>
 <p>"Theory of Magicity" is an experimental game made for an university course. The core idea is to treat magic as a physics-like system rather than a set of canned spells. So instead of having a "haste" spell that doubles a character's speed, this game has a "magic field" (analogous to gravity in real world) that affects how fast (or slow) a character can move.</p>
-<p>The latest release of the game boasts:</p>
-<ul>
-<li/><b>Fun for the whole family!</b>
-<li/>Physics-like magic system (three magic effects)
-<li/>Four increasingly difficult (but short) levels with <u>storyline</u>
-<li/>Super-fancy visual particle effects
-<li/>Two original music tracks
-<li/>Mediocre graphics
-<li/>Lowsy sound effects
-<li/><blink>Appalling web site!</blink>
-</ul>
 <p>Screenshots:<br/>
 <a href="screenshot1.png"><img src="screenshot1_thumb.png"></a>
 <a href="screenshot2.png"><img src="screenshot2_thumb.png"></a>
 </p>
 
 <h4>Download</h4>
-<p>Binary release for <a href="files/magicity-win32-0.4beta.zip">win32</a>: built via py2exe under wine, hopefully it works. Let me know if you have any problems.</p>
-<p>And the <a href="files/magicity-src-0.4beta.tar.gz">source</a> release, suitable for real operating systems (requires python and pygame).</p>
-</body>
+<p>Binary release for <a href="files/magicity-win32-0.4beta.zip">win32</a>: built via py2exe under wine - seems to work on most machines. Feel free to report problems.</p>
+<p>The <a href="files/magicity-src-0.4beta.tar.gz">source</a> release, suitable for real operating systems (requires python and pygame).</p>
+<p>The bleeding edge code is available on <a href="http://github.com/windo/Theory-of-Magicity">github</a>.</p>
+
+<h4>Features</h4>
+<p>The latest release of the game boasts:</p>
+<ul>
+<li/><b>Fun for the whole family!</b>
+<li/>Physics-like magic system (three magic effects)
+<li/>Four increasingly difficult (but short) levels with a <u>storyline</u>
+<li/>Super-fancy visual particle effects
+<li/>Two original music tracks
+<li/>Mediocre graphics
+<li/>Lowsy sound effects
+<li/><blink>Appalling web site!</blink>
+</ul>
 
 <h4>Magic</h4>
 <p>The game world contains 3 "magic fields": Time, Wind and Life: Time magic compresses and expands time (affects movement), Wind magic pushes characters around and Life magic reduces or regenerates health.</p>
 <p>Each magic field fills the entire game world and each character is affected by each field according to it's value at the characters position in the world. The characters can affect the "magic fields" by creating and moving "magic balls" that influence their respective fields around the balls.</p>
+
 <h4>Controls</h4>
 <p>Game controls as of 0.4beta:</p>
 <table>
@@ -52,4 +63,5 @@
 <tr /><td />movement<td />move and set the power of currently selected magic ball
 </table>
 
+</body>
 </html>
