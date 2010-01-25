@@ -595,7 +595,7 @@ class Siege(Story):
             self.guardians.append(guardian)
 
           # player-controlled object
-          self.dude = world.new_actor(actors.Dude, -100)
+          self.dude = world.new_actor(actors.Dude, -50)
 
           world.view.goto(200.0)
           world.view.follow(self.dude, pan = True)
@@ -682,7 +682,7 @@ class Siege(Story):
             if self.narrated() and self.time_passed(15):
               self.narrate("I must run back to the guardpost [left] really fast.")
 
-            if self.dude.pos < 50.0:
+            if self.dude.pos < 100.0:
               self.set_state("block")
 
           elif self.state == "block":

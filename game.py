@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-import cProfile
 
 import time, sys, math
 from random import random
@@ -810,5 +809,8 @@ class Game:
           
 if __name__ == "__main__":
    g = Game()
-   #cProfile.run("g.title_screen()", "game.stats")
-   g.title_screen()
+   if len(sys.argv) >= 2 and sys.argv[1] == "--profile":
+     import cProfile
+     cProfile.run("g.title_screen()", "game.stats")
+   else:
+     g.title_screen()
