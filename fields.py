@@ -39,7 +39,7 @@ class MagicField:
           return v
 
       # Get the field's value at pos as translated through the view
-      def draw(self, view, screen, draw_debug = False):
+      def draw(self, view, draw_debug = False):
           # step should be float to cover the whole range
           step = float(view.sc_w()) / float(self.draw_real_points)
           cur  = self.value(view.sc2pl_x(0))
@@ -54,9 +54,9 @@ class MagicField:
                 # color of the line segment
                 alpha = min(192, abs(value) * 256 * 8)
                 color = self.color + (alpha,)
-                s = effects.get_circle(color, min(5, abs(value) * 100), screen, 3)
+                s = effects.get_circle(color, min(5, abs(value) * 100), view.screen, 3)
                 ypos = view.sc_h() - (value + 1.0) * view.sc_h() / 2.0
-                screen.blit(s, (pos - step + j * step / self.interpolate, ypos))
+                view.blit(s, (pos - step + j * step / self.interpolate, ypos))
 
             # draw debug
             if draw_debug and i % (self.draw_real_points / 5) == 0 and abs(cur) > 0.01:
@@ -64,7 +64,7 @@ class MagicField:
               txt = "%s.value(%.2f:%.2f) = %.2f" % (str(self.__class__).split(".")[1], i, at, next)
               txt = self.loader.debugfont.render(txt, True, (255, 255, 255))
               ypos = view.sc_h() - (next + 1.0) * view.sc_h() / 2.0
-              screen.blit(txt, (pos, ypos))
+              view.blit(txt, (pos, ypos))
 
             # next interpolation
             cur = next
@@ -201,32 +201,33 @@ class MagicParticle(actors.Actor):
           else:
             self.deadtimer = False
 
-      def draw(self, screen, draw_debug = False):
-          actors.Actor.draw(self, screen, draw_debug)
+      def draw(self, draw_debug = False):
+          view = self.world.view
+          actors.Actor.draw(self, draw_debug)
           # draw magic "ball"
           radius = 25 
           x      = self.world.view.pl2sc_x(self.pos)
           y      = self.world.view.sc_h() - self.hover_height
-          s = effects.get_circle((255, 255, 255, 64), radius, screen, blur = 15)
-          screen.blit(s, (x - radius, y - radius))
+          s = effects.get_circle((255, 255, 255, 64), radius, view.screen, blur = 15)
+          view.blit(s, (x - radius, y - radius))
 
           # draw field effects
           for fx in self.particle_effects:
-            fx.draw(screen, draw_debug)
+            fx.draw(view.screen, draw_debug)
             
           # if it's selected
           if self.selected:
             radius = 50
-            s = effects.get_circle((255, 255, 255, 16), radius, screen)
-            screen.blit(s, (x - radius, y - radius))
+            s = effects.get_circle((255, 255, 255, 16), radius, view.screen)
+            view.blit(s, (x - radius, y - radius))
             # affects
-            s = effects.get_circle((255, 255, 255, 64), 5, screen, 2)
+            s = effects.get_circle((255, 255, 255, 64), 5, view.screen, 2)
             for caster in self.affects:
               accel, mult = caster.affect_particle(self)
               for i in xrange(5):
                 xdiff = accel * 55.0 / 10 / 5 * i
                 ydiff = mult  * 55.0 / 10 / 5 * i
-                screen.blit(s, (x - 5 + xdiff, y - 5 - ydiff))
+                view.blit(s, (x - 5 + xdiff, y - 5 - ydiff))
 
 
 

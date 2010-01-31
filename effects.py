@@ -2,6 +2,7 @@
 
 import pygame, math, time
 from random import random
+import graphics
 
 global circle_cache, circle_cache_hit, circle_cache_miss
 circle_cache = {}
@@ -52,6 +53,7 @@ def get_circle(color, radius, screen = False, blur = 0):
       # optimize for screen
       if screen:
         s = s.convert_alpha(screen)
+      s = graphics.glImg(s)
 
       # save to cache
       circle_cache[(color, radius, blur)] = s
@@ -133,9 +135,10 @@ class ParticleEffect:
               dot.img = s
               dot.ts  = now
             if self.magic:
-              x = self.magic.world.view.pl2sc_x(dot.pos) + dot.x - radius
-              y = self.magic.world.view.sc_h() - dot.hover + dot.y - radius
-              screen.blit(s, (x, y))
+              view = self.magic.world.view
+              x = view.pl2sc_x(dot.pos) + dot.x - radius
+              y = view.sc_h() - dot.hover + dot.y - radius
+              view.blit(s, (x, y))
             else:
               screen.blit(s, (dot.x + self.xofs - radius, 100 + dot.y - radius))
 

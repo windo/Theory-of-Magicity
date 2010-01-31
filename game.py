@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-
 import time, sys, math
 from random import random
 from operator import attrgetter
@@ -9,8 +8,14 @@ from operator import attrgetter
 import pygame
 from pygame.locals import *
 
+# openGL
+import OpenGL
+OpenGL.ERROR_CHECKING = False
+from OpenGL.GL import *
+from OpenGL.GLU import *
+
 # game libraries
-import actors, fields, stories, effects
+import actors, fields, stories, graphics, effects
 
 class ResourceLoader:
       """
@@ -24,17 +29,20 @@ class ResourceLoader:
             def __str__(self):
                 return "No Image %s" % (self.name) 
 
-      def __init__(self, screen):
+      def __init__(self, screen, opengl = True):
           self.spritelists = {}
           self.imagelist   = {}
           self.soundlist   = {}
           self.screen      = screen
+          self.use_opengl  = opengl
 
           # load fonts
-          self.biggoth   = pygame.font.Font("font/Deutsch.ttf", 104)
-          self.smallgoth = pygame.font.Font("font/Deutsch.ttf", 56)
-          self.textfont  = pygame.font.Font("font/angltrr.ttf", 20)
-          self.debugfont = pygame.font.Font("font/freesansbold.ttf", 16)
+          self.spritelists["dummyfont"] = []
+          font = graphics.glFont
+          self.biggoth   = font("font/Deutsch.ttf", 104)
+          self.smallgoth = font("font/Deutsch.ttf", 56)
+          self.textfont  = font("font/angltrr.ttf", 20)
+          self.debugfont = font("font/freesansbold.ttf", 16)
 
           # scaling function
           if hasattr(pygame.transform, "smoothscale"):
@@ -84,27 +92,27 @@ class ResourceLoader:
           # make an image list as well?
           if listname:
             if not width:
-              if flip:
-                img = pygame.transform.flip(img, True, False)
-              if resize:
-                img = self.scale(img, resize)
-              img = img.convert_alpha(self.screen)
-              self.spritelists[listname] = [img]
-            else:
-              # use all subsurfaces?
-              if not to:
-                to = int(img.get_width() / width)
-              self.spritelists[listname] = []
-              for i in xrange(start, to):
-                rect = [ i * width, 0, width, img.get_height() ]
-                subimg = img.subsurface(rect)
-                if flip:
-                  subimg = pygame.transform.flip(subimg, True, False)
-                if resize:
-                  subimg = self.scale(subimg, resize)
-                # TODO: does this help at all?
-                subimg = subimg.convert_alpha(self.screen)
-                self.spritelists[listname].append(subimg)
+              width = img.get_width()
+            # use all subsurfaces?
+            if not to:
+              to = int(img.get_width() / width)
+            self.spritelists[listname] = []
+            for i in xrange(start, to):
+              rect = [ i * width, 0, width, img.get_height() ]
+              subimg = img.subsurface(rect)
+              self.process_sprite(listname, subimg, flip, resize)
+
+      def process_sprite(self, listname, img, flip, resize):
+          if flip:
+            img = pygame.transform.flip(img, True, False)
+          if resize:
+            img = self.scale(img, resize)
+          # TODO: does this help at all?
+          #img = img.convert_alpha(self.screen)
+          if self.use_opengl:
+            img = graphics.glImg(img)
+          self.spritelists[listname].append(img)
+          return img
 
       def get_sprite(self, name):
           if name in self.imagelist.keys():
@@ -133,13 +141,17 @@ class View:
       Viewport/scale to use for translating in-game coordinates to screen coordinates
       and vice versa
       """
-      def __init__(self, view, plane):
+      def __init__(self, screen, plane):
           """
           view is (width, height) - input/output scale
           plane is (x1, y1, x2, y2) - the MagicField area to fit in the view
           """
           # screen / plane
-          self.view   = list(view)
+          self.screen = screen
+          self.blit   = self.opengl_blit
+          self.fill   = graphics.glfill
+
+          self.view   = [screen.get_width(), screen.get_height()]
           self.plane  = list(plane)
           self.recalculate()
           # camera
@@ -177,6 +189,14 @@ class View:
           return (x - self.offset_x) / self.mult_x
       def pl2sc_y(self, y):
           return (y - self.offset_y) / self.mult_y
+
+      # draw
+      def plain_blit(self, img, coords):
+          self.screen.blit(img, coords)
+      def opengl_blit(self, img, coords):
+          glLoadIdentity()
+          glTranslate(coords[0], coords[1], 0)
+          glCallList(img.genlist)
 
       # camera stuff
       def get_center_x(self):
@@ -358,20 +378,29 @@ class Game:
 
           # screen params
           screensize  = (1024, 768)
-          flags       = FULLSCREEN
-          #flags       = FULLSCREEN | HWSURFACE | DOUBLEBUF
+          flags       = FULLSCREEN | HWSURFACE | DOUBLEBUF | OPENGL
           self.screen = pygame.display.set_mode(screensize, flags)
-          #screensize  = (800, 600)
-          #self.screen = pygame.display.set_mode(screensize)
-          self.view   = View(screensize, (0, 100, 0, 50))
+          self.view   = View(self.screen, (0, 100, 0, 50))
+          
+          glClearColor(0.0, 0.0, 0.0, 1.0)
+          glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
+
+          glMatrixMode(GL_PROJECTION)
+          glLoadIdentity();
+          gluOrtho2D(0, screensize[0], screensize[1], 0)
+          glMatrixMode(GL_MODELVIEW)
+
+          glEnable(GL_TEXTURE_2D)
+          glEnable(GL_BLEND)
+          glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
           # loading resources
           self.loader = ResourceLoader(self.screen)
           # for title screen
-          self.loader.sprite("title-bg", resize = screensize)
+          self.loader.sprite("title-bg", "title-bg", resize = screensize)
 
       def center_blit(self, img, x, y):
-          self.screen.blit(img, (self.view.sc_w() / 2 - img.get_width() / 2 + x, y))
+          self.view.blit(img, (self.view.sc_w() / 2 - img.get_width() / 2 + x, y))
           
       def set_music(self, track):
           pygame.mixer.music.load("music/%s.ogg" % (track))
@@ -406,18 +435,19 @@ class Game:
             i += 1
 
           # bg
-          background = self.loader.get_sprite("title-bg")
+          background = self.loader.get_spritelist("title-bg")[0]
 
           while forever:
             # graphics
-            self.screen.blit(background, (0, 0))
+            self.view.blit(background, (0, 0))
             self.center_blit(titleshadow, 5, 25)
             self.center_blit(title, 0, 20)
             # menu
             for item in menu:
               self.center_blit(item[item["seq"] == select and "high" or "low"], 0, item["pos"])
             # set on screen
-            pygame.display.update()
+            glFlush()
+            pygame.display.flip()
 
             # events
             for event in pygame.event.get():
@@ -539,15 +569,17 @@ class Game:
 
             update_time = time.time() - update_stime
           
+            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
+            glLoadIdentity() 
             ## draw
             draw_stime = bg_stime = time.time()
             # background changes slightly in color
             if world.paused():
               day = -1.0
-              screen.fill([16, 32, 96])
+              view.fill([16, 32, 96])
             else:
               day = math.sin(time.time()) + 1
-              screen.fill([day * 32, 32 + day * 32, 128 + day * 32])
+              view.fill([day * 32, 32 + day * 32, 128 + day * 32])
 
             # draw actors
             sort_stime = time.time()
@@ -557,25 +589,25 @@ class Game:
             actors_stime = time.time()
             debug_offset = 1
             for actor in world.get_actors(exclude = [fields.MagicParticle]):
-              actor.draw(screen, int(draw_debug) * debug_offset)
+              actor.draw(int(draw_debug) * debug_offset)
               debug_offset = (debug_offset + 40) % (view.sc_h() - 20 - 100)
             draw_actors_time = time.time() - actors_stime
             # magicparticles
             magic_stime = time.time()
             for actor in world.get_actors(include = [fields.MagicParticle]):
-              actor.draw(screen, int(draw_debug) * debug_offset)
+              actor.draw(int(draw_debug) * debug_offset)
               debug_offset = (debug_offset + 40) % (view.sc_h() - 20 - 100)
             draw_magic_time = time.time() - magic_stime
 
             # draw fields
             fields_stime = time.time()
             for field in world.all_fields():
-              field.draw(view, screen, draw_debug = draw_debug)
+              field.draw(view, draw_debug = draw_debug)
             draw_fields_time = time.time() - fields_stime
 
             misc_stime = time.time()
             # draw storyline elements
-            story.draw(screen, draw_debug = draw_debug)
+            story.draw(draw_debug = draw_debug)
 
             # draw performance stats
             if draw_debug:
@@ -593,12 +625,12 @@ class Game:
                 fps_img      = font.render(fps_txt, True, color)
                 draw_times   = font.render(draw_times_txt, True, color)
                 update_times = font.render(update_times_txt, True, color)
-              screen.fill((0,0,0), (10, 10, fps_img.get_width(), fps_img.get_height()))
-              screen.fill((0,0,0), (10, 30, draw_times.get_width(), draw_times.get_height()))
-              screen.fill((0,0,0), (10, 50, update_times.get_width(), update_times.get_height()))
-              screen.blit(fps_img, (10, 10))
-              screen.blit(draw_times, (10, 30))
-              screen.blit(update_times, (10, 50))
+              view.fill((0,0,0), (10, 10, fps_img.get_width(), fps_img.get_height()))
+              view.fill((0,0,0), (10, 30, draw_times.get_width(), draw_times.get_height()))
+              view.fill((0,0,0), (10, 50, update_times.get_width(), update_times.get_height()))
+              view.blit(fps_img, (10, 10))
+              view.blit(draw_times, (10, 30))
+              view.blit(update_times, (10, 50))
             
             # draw magic selection
             if get_magic:
@@ -615,7 +647,8 @@ class Game:
             
             # drawing done!
             display_stime = time.time()
-            pygame.display.update()
+            glFlush()
+            pygame.display.flip()
             update_display_time = time.time() - display_stime
           
             ## handle events

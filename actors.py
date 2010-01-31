@@ -1,5 +1,6 @@
 import pygame, math, time
 from random import random
+import graphics
 
 class Drawable:
       """
@@ -107,11 +108,12 @@ class Drawable:
             y = view.sc_h() - self.img_h - y
 
           return x, y
-      def draw(self, screen, draw_debug = False):
+      def draw(self, draw_debug = False):
           """
           Draw the image on screen, called in sequence from main game loop for each actor
           """
           x, y = self.get_xy()
+          view = self.world.view
 
           # do not draw off-the screen actors
           if x + self.img_w / 2 < 0 or x - self.img_w / 2 > self.world.view.sc_w():
@@ -125,7 +127,7 @@ class Drawable:
               txts.append(self.world.loader.debugfont.render(line, True, (255, 255, 255)))
             i = 0
             for txt in txts:
-              screen.blit(txt, (x, int(draw_debug) + 20 + i * 20))
+              view.blit(txt, (x, int(draw_debug) + 20 + i * 20))
               i += 1
 
           # do not draw/animate spriteless actors
@@ -150,7 +152,7 @@ class Drawable:
 
           # actual drawing
           img = imglist[self.cur_img_idx]
-          screen.blit(img, (x - self.img_w / 2, y))
+          view.blit(img, (x - self.img_w / 2, y))
 
 class Actor(Drawable):
       """
@@ -325,11 +327,11 @@ class Actor(Drawable):
               self.controller.update()
               self.last_control = self.world.get_time()
       
-      def draw(self, screen, draw_debug = False):
+      def draw(self, draw_debug = False):
           """
           Draw the image on screen, called in sequence from main game loop for each actor
           """
-          Drawable.draw(self, screen, draw_debug)
+          Drawable.draw(self, draw_debug)
 
           # draw hp bar (if there is one)
           if self.initial_hp:
@@ -337,8 +339,8 @@ class Actor(Drawable):
             hp_color  = (64, 255, 64)
             hp_border = (x - 15, y, 30, 3)
             hp_fill   = (x - 15, y, 30 * (self.hp / self.initial_hp), 3)
-            pygame.draw.rect(screen, hp_color, hp_border, 1)
-            pygame.draw.rect(screen, hp_color, hp_fill, 0)
+            graphics.rect(hp_color, hp_border, 1)
+            graphics.rect(hp_color, hp_fill, 0)
 
 class MagicCaster:
       """
@@ -485,7 +487,7 @@ class Background(Drawable):
       distance = 3.0
       stacking = 2
 
-      def draw(self, screen, draw_debug = False): 
+      def draw(self, draw_debug = False): 
           img    = self.img_list[0]
           bg_w   = img.get_width() 
           bg_h   = img.get_height()
@@ -493,7 +495,7 @@ class Background(Drawable):
           offset = (view.pl2sc_x(0) / self.distance) % bg_w - bg_w 
           count  = int(view.sc_w() / bg_w) + 2 
           for i in xrange(count):
-            screen.blit(img, (offset + i * bg_w, view.sc_h() - bg_h))
+            view.blit(img, (offset + i * bg_w, view.sc_h() - bg_h))
 
 class BackgroundHills(Background):
       sprite_names = ["hills"]
