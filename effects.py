@@ -10,10 +10,12 @@ circle_cache_hit = circle_cache_miss = 0
 def get_circle(color, radius, screen = False, blur = 0):
     global circle_cache, circle_cache_hit, circle_cache_miss
     # color accuracy
-    c = []
+    c = tuple()
     for i in xrange(4):
-      c.append(min(round(color[i] / 8) * 8, 255))
-    color = tuple(c)
+      colval = int(color[i] / 8 + 0.5) * 8
+      if colval > 255: colval = 255
+      c += (colval,)
+    color  = tuple(c)
     radius = int(radius)
     blur   = int(blur)
 
