@@ -120,27 +120,27 @@ class ParticleEffect:
             self.dots.append(dot)
             
       def draw(self, screen, draw_debug = False):
+          if self.magic:
+            now = self.magic.world.get_time()
+          else:
+            now = time.time()
           for dot in self.dots:
-            color        = self.get_color(dot)
-            radius, blur = self.get_radius(dot)
-            if self.magic:
-              now = self.magic.world.get_time()
-            else:
-              now = time.time()
             if dot.ts + dot.img_cache_time > now and dot.img:
               s = dot.img
             else:
+              color        = self.get_color(dot)
+              radius, blur = self.get_radius(dot)
               # TODO: there really should be a better way to do this (but apparently there isn't?)
               s = get_circle(color, radius, screen, blur)
-              dot.img = s
               dot.ts  = now
+              dot.img = s
             if self.magic:
               view = self.magic.world.view
-              x = view.pl2sc_x(dot.pos) + dot.x - radius
-              y = view.sc_h() - dot.hover + dot.y - radius
+              x = view.pl2sc_x(dot.pos) + dot.x - s.get_width() / 2
+              y = view.sc_h() - dot.hover + dot.y - s.get_height() / 2
               view.blit(s, (x, y))
             else:
-              screen.blit(s, (dot.x + self.xofs - radius, 100 + dot.y - radius))
+              screen.blit(s, (dot.x + self.xofs - s.get_width() / 2, 100 + dot.y - s.get_height() / 2))
 
 # A template
 class Dummy(ParticleEffect):

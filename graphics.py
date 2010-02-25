@@ -46,6 +46,7 @@ class glImg:
 
           texdata = pygame.image.tostring(img, "RGBA", 1)
           tex = glGenTextures(1)
+          self.__texture = tex
           glBindTexture(GL_TEXTURE_2D, tex)
           glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
           glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
@@ -63,6 +64,9 @@ class glImg:
           glEnd()
           glEndList()
           self.genlist = genlist
+
+      def __del__(self):
+          glDeleteTextures(self.__texture);
 
       def get_width(self):
           return self.width

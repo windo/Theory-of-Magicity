@@ -100,7 +100,7 @@ class MagicParticle(actors.Actor):
       initial_hp   = 0
       directed     = False
       stacking     = 26
-      in_dev_mode  = True
+      in_dev_mode  = False
 
       # Particle params
       base_dev     = 5.0
