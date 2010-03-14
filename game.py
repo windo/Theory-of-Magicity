@@ -420,11 +420,12 @@ class Game:
           titleshadow = self.loader.biggoth.render(self.gamename, True, (48, 48, 48))
 
           menu = [
-                  { "action":  stories.Shepherd, "music": "happytheme", "txt": "Gentle Shepherd" },
-                  { "action":  stories.Massacre, "music": "warmarch2",  "txt": "Fiery Massacre" },
-                  { "action":  stories.Blockade, "music": "warmarch2",  "txt": "Guardian Blockade" },
-                  { "action":  stories.Siege,    "music": "warmarch2",  "txt": "Under Siege" },
-                  { "action":  "exit", "txt": "Exit Game" },
+                  { "action": stories.Shepherd, "music": "happytheme", "txt": "Gentle Shepherd" },
+                  { "action": stories.Massacre, "music": "warmarch2",  "txt": "Fiery Massacre" },
+                  { "action": stories.Blockade, "music": "warmarch2",  "txt": "Guardian Blockade" },
+                  { "action": stories.Siege,    "music": "warmarch2",  "txt": "Under Siege" },
+                  { "action": stories.TestBed,  "music": "happytheme", "txt": "Testbed" },
+                  { "action": "exit", "txt": "Exit Game" },
                  ]
           i = 0
           for item in menu:
@@ -639,8 +640,8 @@ class Game:
               for ball in local_balls:
                 ball_txt = world.loader.textfont.render("%u: %s" % (i, str(ball.__class__).split(".")[1]), True, ball.field.color)
                 ball_nr  = world.loader.textfont.render("%u" % (i), True, ball.field.color)
-                screen.blit(ball_txt, (10, 40 + i * 20))
-                screen.blit(ball_nr, (view.pl2sc_x(ball.pos), view.sc_h() - 80))
+                view.blit(ball_txt, (10, 40 + i * 20))
+                view.blit(ball_nr, (view.pl2sc_x(ball.pos), view.sc_h() - 80))
                 i += 1
             draw_misc_time = time.time() - misc_stime
             draw_time = time.time() - draw_stime

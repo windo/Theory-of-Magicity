@@ -67,6 +67,7 @@ class glImg:
 
       def __del__(self):
           glDeleteTextures(self.__texture);
+          glDeleteLists(self.genlist, 1)
 
       def get_width(self):
           return self.width

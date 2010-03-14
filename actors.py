@@ -558,7 +558,7 @@ class Dragon(Character):
       sprite_names = ["dragon-left", "dragon-right"]
       snd_move     = ["crackle1", "crackle2"]
       snd_death    = ["moan1", "moan2"]
-      in_dev_mode  = False
+      in_dev_mode  = True
 
 class Guardian(Character):
       const_speed    = 1.0
@@ -654,6 +654,7 @@ class BirdFlocker(FlyingController):
           # in flock
           self.weight_repel = 10.0
           self.weight_group = 5.0
+          self.weight_speed = 1.0
           # flock shape
           self.prefer_dist  = 5.0
           self.group_size   = 20.0
@@ -702,7 +703,8 @@ class BirdFlocker(FlyingController):
           # find other birds
           neighs = self.puppet.world.get_actors(vis_start, vis_end, include = [SmallBird])
           # flocking
-          flock_xdiff = flock_ydiff = 0.0
+          flock_xdiff  = flock_ydiff  = 0.0
+          flock_xspeed = flock_yspeed = 0.0
           for neigh in neighs:
             if neigh == self.puppet:
               continue
@@ -720,10 +722,17 @@ class BirdFlocker(FlyingController):
             # ignore beyond sight
             else:
               const = 0.0
-            flock_xdiff += const * xdiff
-            flock_ydiff += const * ydiff
+            # synchronize speeds
+            if dist < self.prefer_dist * 2:
+              flock_xspeed += neigh.speed
+              flock_yspeed += neigh.yspeed
+            flock_xdiff  += const * xdiff
+            flock_ydiff  += const * ydiff
           if neighs:
             x, y = self.normalize_xy(flock_xdiff, flock_ydiff, self.weight_flock)
+            self.xdiff += x
+            self.ydiff += y
+            x, y = self.normalize_xy(flock_xspeed, flock_yspeed, self.weight_speed)
             self.xdiff += x
             self.ydiff += y
 
@@ -1139,12 +1148,181 @@ class HunterController(FSMController):
             else:
               self.puppet.magic.move(self.shot, -1.0)
 
-class BehaviourPlanner(Controller):
+class Planner(Controller):
       """
-      Container for behaviour planning controller
+      Container for planning controller
       """
+      control_interval = 0.02
       def __init__(self, *args):
           Controller.__init__(self, *args)
+          self.mission = KillEnemies(self)
+      def debug_info(self):
+          return "Planner:\n%s" % (self.mission.debug_info())
+
+      def update(self):
+          self.mission.update()
+
+class Goal:
+      # maximum total subgoal score
+      maxscore = 2.0
+      # maximum total subgoals
+      maxgoals = 5
+      def __init__(self, controller):
+          self.subgoals   = []
+          self.controller = controller
+          self.puppet     = controller.puppet
+          self.magic      = self.puppet.magic
+          self.world      = self.puppet.world
+      def __str__(self):
+          return "%s(%3.2f)" % (str(self.__class__).split(".")[1], self.score())
+      def debug_info(self, depth = 0):
+          info = "-" * depth + ">%s:\n" % (str(self))
+          for subgoal in self.subgoals:
+            info += subgoal.debug_info(depth + 1)
+          return info
+      def update(self):
+          # add any new goals
+          self.add_subgoals()
+          
+          # remove uninteresting goals
+          i = 0
+          totalscore = 0.0
+          self.subgoals.sort(lambda x, y: cmp(x.score(), y.score()))
+          while i < len(self.subgoals):
+            goal = self.subgoals[i]
+            if totalscore > self.maxscore:
+              self.subgoals.pop(i)
+            elif i > self.maxgoals:
+              self.subgoals.pop(i)
+            elif goal.score() <= 0.0:
+              self.subgoals.pop(i)
+            else:
+              totalscore += goal.score()
+              i += 1
+          
+          # pass the goal action on
+          acted = False
+          for goal in self.subgoals:
+            if random() < goal.score():
+              acted = goal.update()
+            if acted:
+              return True
+          return False
+          
+      def add_subgoals(self):
+          raise Exception, self.__class__
+      def score(self):
+          raise Exception, self.__class__
+          
+class KillEnemies(Goal):
+      maxgoals = 2
+      def add_subgoals(self):
+          # find unhandled prey
+          # TODO: frequency
+          pos = self.puppet.pos
+          targets = self.world.get_actors(pos - 75.0, pos + 75.0, include = [Dude])
+          for target in targets:
+            targetting = False
+            for goal in self.subgoals:
+              if isinstance(goal, KillEnemy) and goal.target == target:
+                targetting = True
+                break
+            if not targetting:
+              self.subgoals.append(KillEnemy(self.controller, target))
+      def score(self):
+          return 1.0
+
+class KillEnemy(Goal):
+      def __init__(self, controller, target):
+          Goal.__init__(self, controller)
+          self.target = target
+          self.subgoals.append(PosLifeBall(self.controller, target))
+
+      def __str__(self):
+          return "%s: %s" % (Goal.__str__(self), self.target)
+      def add_subgoals(self):
+          pass
+
+      def score(self):
+          if self.target.dead:
+            return 0.0
+          dist = abs(self.target.pos - self.puppet.pos)
+          if dist > 100.0:
+            return 0.0
+          return (100.0 - dist) / 100.0 * max((self.target.initial_hp - self.target.hp) / self.target.initial_hp, 0.5)
+
+class PosLifeBall(Goal):
+      def __init__(self, controller, target):
+          Goal.__init__(self, controller)
+          self.target = target
+      def __str__(self):
+          return "%s: %s" % (Goal.__str__(self), self.target)
+      def score(self):
+          return 0.5
+      def add_subgoals(self):
+          pos = self.target.pos
+          targets = self.world.get_actors(pos - 75.0, pos + 75.0, include = [fields.LifeBall])
+          for target in targets:
+            in_goal = False
+            for goal in self.subgoals:
+              if isinstance(goal, MoveBall) and goal.ball == target:
+                # TODO: don't cheat like this
+                in_goal = True
+                break
+            if not in_goal:
+              self.subgoals.append(MoveBall(self.controller, target, self.target))
+
+          if len(targets) == 0:
+            self.subgoals.append(CreateBall(self.controller, fields.LifeBall))
+
+class CreateBall(Goal):
+      def __init__(self, controller, balltype):
+          Goal.__init__(self, controller)
+          self.balltype = balltype
+          self.created  = False
+      def update(self):
+          if not self.created:
+            self.magic.new(fields.LifeBall)
+            self.created = True
+          return True
+      def score(self):
+          if self.created:
+            return 0.0
+          else:
+            return 1.0
+
+class MoveBall(Goal):
+      def __init__(self, controller, ball, dest):
+          Goal.__init__(self, controller)
+          self.ball = ball
+          self.dest = dest
+      def __str__(self):
+          return "%s: %s -> %s" % (Goal.__str__(self), self.ball, self.dest)
+      def dest_pos(self):
+          if isinstance(self.dest, Actor):
+            return self.dest.pos
+          else:
+            return self.dest
+      def update(self):
+          ball = self.ball
+          dest = self.dest_pos()
+          diff = ball.pos + ball.speed - dest
+          self.magic.power(ball, 5)
+          if abs(diff) < 1.0:
+            self.magic.move(ball, 0)
+          elif diff > 0:
+            self.magic.move(ball, -5)
+          else:
+            self.magic.move(ball, 5)
+          return True
+      def score(self):
+          diff = self.ball.pos + self.ball.speed - self.dest_pos()
+          if abs(diff) > 100.0:
+            return 0.0
+          return (100.0 - abs(diff)) / 100.0
+
+class BehavingDragon(Dragon):
+      control = Planner
 
 class HuntingDragon(Dragon):
       control = HunterController
@@ -1154,8 +1332,10 @@ class HuntingVillager(Villager):
       prey    = [Dragon]
 class ScaredRabbit(Rabbit):
       control = WimpyController
+
 class ControlledGuardian(Guardian):
       control = GuardianController
+
 class FlockingBird(SmallBird):
       control = BirdFlocker
 class PredatorBird(BigBird):

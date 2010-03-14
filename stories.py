@@ -148,6 +148,17 @@ class Story:
             view.blit(img, (10, line_y))
             line_y += img.get_height() + 5
 
+class TestBed(Story):
+      def __init__(self, *args):
+          Story.__init__(self, *args)
+
+          self.default_scenery()
+          world = self.world
+          world.new_actor(actors.BehavingDragon, 100.0)
+          self.dude = world.new_actor(actors.Dude, 50.0)
+      def player(self):
+          return self.dude
+
 class Shepherd(Story):
       def __init__(self, *args):
           Story.__init__(self, *args)
