@@ -154,8 +154,12 @@ class TestBed(Story):
 
           self.default_scenery()
           world = self.world
-          world.new_actor(actors.BehavingDragon, 100.0)
-          self.dude = world.new_actor(actors.Dude, 50.0)
+          for i in xrange(10):
+            dragon = world.new_actor(actors.BehavingDragon, 100.0 + random() * 500.0)
+            villager = world.new_actor(actors.BehavingVillager, 100.0 + random() * 500.0)
+            dragon.controller.set_waypoint(350)
+            villager.controller.set_waypoint(350)
+          self.dude = world.new_actor(actors.Dude, 25.0)
       def player(self):
           return self.dude
 

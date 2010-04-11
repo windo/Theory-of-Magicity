@@ -17,6 +17,10 @@ class MagicField:
       def __init__(self, loader):
           self.particles  = []
           self.loader  = loader
+      def __str__(self):
+          return str(self.__class__).split(".")[1]
+      def __repr__(self):
+          return self.__str__()
 
       # could be overloaded
       def value(self, pos):
@@ -61,7 +65,7 @@ class MagicField:
             # draw debug
             if draw_debug and i % (self.draw_real_points / 5) == 0 and abs(cur) > 0.01:
               at  = view.sc2pl_x(pos)
-              txt = "%s.value(%.2f:%.2f) = %.2f" % (str(self.__class__).split(".")[1], i, at, next)
+              txt = "%s.value(%.2f:%.2f) = %.2f" % (str(self), i, at, next)
               txt = self.loader.debugfont.render(txt, True, (255, 255, 255))
               ypos = view.sc_h() - (next + 1.0) * view.sc_h() / 2.0
               view.blit(txt, (pos, ypos))
@@ -229,8 +233,6 @@ class MagicParticle(actors.Actor):
                 ydiff = mult  * 55.0 / 10 / 5 * i
                 view.blit(s, (x - 5 + xdiff, y - 5 - ydiff))
 
-
-
 class TimeBall(MagicParticle):
       sprite_names = []
       effectors    = [ effects.Energy ]
@@ -244,3 +246,6 @@ class LifeBall(MagicParticle):
       sprite_names = []
       effectors    = [ effects.Fire, effects.Nature ]
       fieldtype    = LifeField
+
+field2ball = { TimeField: TimeBall, WindField: WindBall, LifeField: LifeBall }
+

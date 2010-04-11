@@ -588,16 +588,13 @@ class Game:
             sort_time = time.time() - sort_stime
 
             actors_stime = time.time()
-            debug_offset = 1
             for actor in world.get_actors(exclude = [fields.MagicParticle]):
-              actor.draw(int(draw_debug) * debug_offset)
-              debug_offset = (debug_offset + 40) % (view.sc_h() - 20 - 100)
+              actor.draw(draw_debug)
             draw_actors_time = time.time() - actors_stime
             # magicparticles
             magic_stime = time.time()
             for actor in world.get_actors(include = [fields.MagicParticle]):
-              actor.draw(int(draw_debug) * debug_offset)
-              debug_offset = (debug_offset + 40) % (view.sc_h() - 20 - 100)
+              actor.draw(draw_debug)
             draw_magic_time = time.time() - magic_stime
 
             # draw fields
@@ -811,14 +808,26 @@ class Game:
                     if sel_magic:
                       sel_magic.selected = False
                     # capture, select
-                    sel_magic          = new_particle
+                    sel_magic = new_particle
                     player.magic.capture(sel_magic)
                     sel_magic.selected = True
                     mouse_control      = True
                     pygame.mouse.set_visible(False)
 
-                elif event.button == 2:
-                  pass
+                elif event.button == 3:
+                  pos = view.sc2pl_x(event.pos[0])
+                  actors = world.get_actors(pos - 5, pos + 5)
+                  if actors:
+                    # find the closest particle
+                    closest = 5
+                    select  = False
+                    for actor in actors:
+                      dist = abs(actor.pos - pos)
+                      if dist < closest:
+                        closest = dist
+                        select = actor
+                    if select:
+                      select.debug_me ^= 1
 
               elif event.type == MOUSEBUTTONUP:
                 if event.button == 1:
