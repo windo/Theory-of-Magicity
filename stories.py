@@ -3,6 +3,9 @@ import pygame
 from random import random
 
 class Story:
+      menuname  = "Blank Story Name"
+      themesong = "happytheme"
+
       def __init__(self, world):
           self.world = world
           # story state
@@ -14,6 +17,10 @@ class Story:
           # stories need narrations
           self.narrations  = []
           self.queue       = []
+
+      def gen_menuitem(klass):
+          return { "action": klass, "txt": klass.menuname }
+      gen_menuitem = classmethod(gen_menuitem)
 
       def default_scenery(self):
           """
@@ -31,12 +38,16 @@ class Story:
           for i in xrange(6):
             world.new_actor(actors.Cloud, -1200 + (2500 / 6) * i)
 
+          # some ambient lifeforms
           for i in xrange(25):
             bird = world.new_actor(actors.FlockingBird, random() * 1000 - 500)
             bird.ypos = random() * bird.controller.ypos_upper_bound
           for i in xrange(2):
             bird = world.new_actor(actors.PredatorBird, random() * 1000 - 500)
             bird.ypos = random() * 10.0
+
+          # set music
+          world.loader.set_music(self.themesong)
 
       # all narrations done!
       def narrated(self, delay = 5.0):
@@ -149,21 +160,24 @@ class Story:
             line_y += img.get_height() + 5
 
 class TestBed(Story):
+      menuname = "Testbed"
       def __init__(self, *args):
           Story.__init__(self, *args)
 
           self.default_scenery()
           world = self.world
-          for i in xrange(10):
-            dragon = world.new_actor(actors.BehavingDragon, 100.0 + random() * 500.0)
-            villager = world.new_actor(actors.BehavingVillager, 100.0 + random() * 500.0)
-            dragon.controller.set_waypoint(350)
-            villager.controller.set_waypoint(350)
+          #for i in xrange(10):
+          #  dragon = world.new_actor(actors.BehavingDragon, 100.0 + random() * 500.0)
+          #  villager = world.new_actor(actors.BehavingVillager, 100.0 + random() * 500.0)
+          #  dragon.controller.set_waypoint(350)
+          #  villager.controller.set_waypoint(350)
+          world.new_actor(actors.BehavingDragon, 125.0)
           self.dude = world.new_actor(actors.Dude, 25.0)
       def player(self):
           return self.dude
 
 class Shepherd(Story):
+      menuname = "Gentle Shepherd"
       def __init__(self, *args):
           Story.__init__(self, *args)
 
@@ -343,6 +357,8 @@ class Shepherd(Story):
               self.narrate("...to guide them between the posts [to the right].", duration = 10.0)
 
 class Massacre(Story):
+      menuname  = "Fiery Massacre"
+      themesong = "warmarch2"
       def __init__(self, *args):
           Story.__init__(self, *args)
 
@@ -513,6 +529,8 @@ class Massacre(Story):
               self.narrate("Slay the dragons! There are still %u rabbits left to save!" % (rabbits))
 
 class Blockade(Story):
+      menuname  = "Guardian Blockade"
+      themesong = "warmarch2"
       def __init__(self, *args):
           Story.__init__(self, *args)
 
@@ -583,6 +601,8 @@ class Blockade(Story):
                 dragon.controller.set_waypoint(200.0)
 
 class Siege(Story):
+      menuname  = "Under Siege"
+      themesong = "warmarch2"
       def __init__(self, *args):
           Story.__init__(self, *args)
 

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import time, sys, math
+import time, sys, math, types
 from random import random
 from operator import attrgetter
 
@@ -135,6 +135,11 @@ class ResourceLoader:
             self.soundlist[name] = snd
       def play_sound(self, name):
           self.soundlist[name].play()
+
+      def set_music(self, track, volume = 0.1):
+          pygame.mixer.music.load("music/%s.ogg" % (track))
+          pygame.mixer.music.set_volume(volume)
+          pygame.mixer.music.play(-1)
 
 class View:
       """
@@ -402,31 +407,47 @@ class Game:
       def center_blit(self, img, x, y):
           self.view.blit(img, (self.view.sc_w() / 2 - img.get_width() / 2 + x, y))
           
-      def set_music(self, track):
-          pygame.mixer.music.load("music/%s.ogg" % (track))
-          pygame.mixer.music.set_volume(0.1)
-          pygame.mixer.music.play(-1)
 
+      story_menu = [
+                    stories.Shepherd.gen_menuitem(),
+                    stories.Massacre.gen_menuitem(),
+                    stories.Blockade.gen_menuitem(),
+                    stories.Siege.gen_menuitem(),
+                   { "action": "exit", "txt": "Return" },
+                   ]
+      test_menu = [
+                   stories.TestBed.gen_menuitem(),
+                   { "action": "exit", "txt": "Return" },
+                  ]
+      title_menu = [
+                    { "action": story_menu, "txt": "Campaign" },
+                    { "action": test_menu, "txt": "Test levels" },
+                    { "action": "exit", "txt": "Exit Game" },
+                   ]
       def title_screen(self):
+          self.run_menu(self.title_menu)
+
+      def run_menu_item(self, item):
+          if item["action"] == "exit":
+            return False
+          elif type(item["action"]) == types.ClassType and issubclass(item["action"], stories.Story):
+            self.run_story(item["action"])
+          else:
+            self.run_menu(item["action"])
+          self.loader.set_music("happytheme")
+          return True
+      def run_menu(self, menu):
           # loop variables
           forever    = True
           select     = 0
 
           # interesting music
-          self.set_music("happytheme")
+          self.loader.set_music("happytheme")
 
           # text
           title       = self.loader.biggoth.render(self.gamename, True, (192, 64, 32))
           titleshadow = self.loader.biggoth.render(self.gamename, True, (48, 48, 48))
 
-          menu = [
-                  { "action": stories.Shepherd, "music": "happytheme", "txt": "Gentle Shepherd" },
-                  { "action": stories.Massacre, "music": "warmarch2",  "txt": "Fiery Massacre" },
-                  { "action": stories.Blockade, "music": "warmarch2",  "txt": "Guardian Blockade" },
-                  { "action": stories.Siege,    "music": "warmarch2",  "txt": "Under Siege" },
-                  { "action": stories.TestBed,  "music": "happytheme", "txt": "Testbed" },
-                  { "action": "exit", "txt": "Exit Game" },
-                 ]
           i = 0
           for item in menu:
             item["seq"]  = i
@@ -458,31 +479,19 @@ class Game:
               if event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
                   forever = False
-
+                elif event.key == K_RETURN or event.key == K_SPACE:
+                  forever = self.run_menu_item(menu[select])
                 elif event.key == K_UP:
                   select -= 1
                 elif event.key == K_DOWN:
                   select += 1
 
-                elif event.key == K_RETURN or event.key == K_SPACE:
-                  item = menu[select]
-                  if item["action"] == "exit":
-                    forever = False
-                  else:
-                    self.set_music(item["music"])
-                    self.run_story(item["action"])
-                  self.set_music("happytheme")
-
               elif event.type == MOUSEBUTTONDOWN:
                 if event.button == 1:
-                  item = menu[select]
-                  if item["action"] == "exit":
-                    forever = False
-                  else:
-                    self.set_music(item["music"])
-                    self.run_story(item["action"])
-                  self.set_music("happytheme")
+                  forever = self.run_menu_item(menu[select])
+
               elif event.type == MOUSEMOTION:
+                # selection with mouse
                 x, y = event.pos
                 center = self.view.sc_w() / 2
                 for item in menu:
