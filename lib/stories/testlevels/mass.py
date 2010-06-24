@@ -14,6 +14,7 @@ class MassBattle(Story):
             d.controller.set_waypoint(800.0)
             v.controller.set_waypoint(200.0)
           self.dude = world.new_actor(actors.Dude, 25.0)
+          world.view.goto(400.0)
       def player(self):
           return self.dude
 

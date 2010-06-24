@@ -74,7 +74,7 @@ class MagicParticle(Actor):
       def update(self):
           Actor.update(self)
 
-          # update fancy graphics drawers
+          # update fancy graphics
           #value = self.field.value(self.pos)
           value = self.mult / 10.0
           if len(self.particle_effects) == 1:

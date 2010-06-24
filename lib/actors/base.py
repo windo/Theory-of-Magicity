@@ -77,7 +77,7 @@ class Drawable:
 
       # used for drawing debug information - may overload to add more information
       def __str__(self):
-          return "%s(%u)" % (str(self.__class__).split(".")[1], self.id)
+          return "%s(%u)" % (self.__class__.__name__, self.id)
       def __repr__(self):
           return self.__str__()
       def debug_info(self):
@@ -473,7 +473,7 @@ class Controller:
       def __init__(self, puppet):
           self.puppet = puppet
       def __str__(self):
-          return "%s" % (str(self.__class__).split(".")[1])
+          return "%s" % (self.__class__.__name__)
       def debug_info(self):
           return "%s" % (str(self))
       def update(self):

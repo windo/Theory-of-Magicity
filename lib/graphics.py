@@ -1,5 +1,6 @@
 import pygame
 from pygame.locals import *
+from lib.debug import dbg
 
 global screen
 
@@ -46,10 +47,11 @@ class glImg:
           self.genlist = genlist
 
       def __del__(self):
-          if glDeleteTextures is not None:
+          try:
             glDeleteTextures(self.__texture)
-          if glDeleteLists is not None:
-            glDeleteLists(self.genlist, 1)
+          except AttributeError:
+            pass
+          glDeleteLists(self.genlist, 1)
 
       def get_width(self):
           return self.width
@@ -140,8 +142,8 @@ def pygfill(color, rect = None):
     else:
       screen.fill(color)
 
-
 if use_opengl:
+  dbg("Using OpenGL")
   init_screen = glinit
 
   image = glImg
@@ -154,6 +156,7 @@ if use_opengl:
 
   Font = glFont
 else:
+  dbg("Using pygame")
   init_screen = pyginit
 
   image = pygimage

@@ -9,7 +9,10 @@ class TestBed(Story):
 
           self.default_scenery()
           world = self.world
-          world.new_actor(actors.BehavingDragon, 125.0)
-          self.dude = world.new_actor(actors.Dude, 25.0)
+          for i in xrange(3):
+            d = world.new_actor(actors.BehavingDragon, 75.0)
+            d.controller.set_waypoint(-100.0)
+          self.dude = world.new_actor(actors.Dude, 500.0)
+          world.view.follow(d)
       def player(self):
           return self.dude

@@ -2,6 +2,7 @@ from random import random
 import pygame, math
 import effects
 import actors
+from lib.debug import dbg
 
 class MagicField:
       """
@@ -14,12 +15,14 @@ class MagicField:
       interpolate = 2
       # field base value - currently nothing changes this
       basevalue  = 0.0
+      # maximum distance where particles will have an effect
+      maxdist = 25
 
       def __init__(self, loader):
-          self.particles  = []
-          self.loader  = loader
+          self.particles = []
+          self.loader    = loader
       def __str__(self):
-          return str(self.__class__).split(".")[1]
+          return self.__class__.__name__
       def __repr__(self):
           return self.__str__()
 
@@ -36,12 +39,33 @@ class MagicField:
       # add all particles together
       def particle_values(self, pos):
           v = self.basevalue
-          for particle in self.particles:
-            # likely not to have any effect farther than that, optimize out
-            if abs(particle.pos - pos) < 25:
+
+          total = len(self.particles)
+          if total > 0:
+            # find first particle
+            #dbg("Finding first particle")
+            first = i = 0
+            last = total - 1
+            while last > first:
+              half = int(math.ceil(float(last - first) / 2))
+              i = first + half
+              #dbg("first=%u i=%u last=%u" % (first, i, last))
+              if self.particles[i].pos - pos < -self.maxdist:
+                first += half
+              else:
+                last -= half
+          
+            # count all of them
+            while i < len(self.particles) and self.particles[i].pos < pos + self.maxdist:
+              particle = self.particles[i]
               mean, dev, mult = particle.get_params()
-              v += 1 / (dev * math.sqrt(2 * math.pi)) * math.exp((-(pos - mean) ** 2)/(2 * dev ** 2)) * mult
+              value = 1 / (dev * math.sqrt(2 * math.pi)) * math.exp((-(pos - mean) ** 2)/(2 * dev ** 2)) * mult
+              v += value
+              i += 1
           return v
+
+      def update(self):
+          self.particles.sort(lambda x, y: cmp(x.pos, y.pos))
 
       # Get the field's value at pos as translated through the view
       def draw(self, view, draw_debug = False):

@@ -1,8 +1,9 @@
 from random import random
 from base import Controller
-from lib import fields
-from mainchars import *
-from magicballs import *
+from lib.fields import *
+from lib.actors.mainchars import *
+from lib.actors.magicballs import *
+from lib.debug import dbg
 
 class Planner(Controller):
       """
@@ -36,7 +37,6 @@ class Planner(Controller):
           for goal in self.goals.values():
             goal.prio = 0.0
           self.mission.prio = 1.0
-          self.mission.dist_prio()
           self.mission.update()
 
           self.decide_movement()
@@ -109,7 +109,8 @@ class Goal:
           self.__init_goal__(*args)
 
       def __str__(self):
-          return "%s(%s: h=%1.3f, p=%1.3f, s=%1.3f)" % (str(self.__class__).split(".")[1], self.goal_args, self.heat, self.prio, self.score)
+          return "%s(%s: h=%1.3f, p=%1.3f, s=%1.3f)" % \
+                 (self.__class__.__name__, self.goal_args, self.heat, self.prio, self.score)
       def debug_info(self, depth = 0):
           info = " " * depth + ">%s\n" % (str(self))
           for subgoal in self.subgoals:
@@ -166,7 +167,10 @@ class TreeGoal(Goal):
       # maximum total subgoal score
       maxscore = 2.0
       # maximum total subgoals
-      maxgoals = 5
+      maxgoals = 3
+      # probability of adding subgoals
+      prob_addsub = 0.1
+
       def __init__(self, *args):
           Goal.__init__(self, *args)
 
@@ -176,27 +180,25 @@ class TreeGoal(Goal):
 
           Picks most interesting subgoal and passes execution forward
           """
-          #print "Entered: %s" % (self.debug_info())
-
+          # organize subgoals by score
+          self.dist_prio()
           for goal in self.subgoals:
             goal.heat  = goal.get_heat()
             goal.score = goal.heat * goal.prio
           self.subgoals.sort(lambda x, y: cmp(y.score, x.score))
           totalscore = self.del_subgoals()
 
-          # pass the goal action on
+          # call the highest scoring subgoal
           acted = False
           for goal in self.subgoals:
             if goal.score == 0.0:
               continue
             elif random() < (goal.score / totalscore):
-              acted = goal.update()
-            if acted:
+              goal.update()
               break
 
-          if not acted or len(self.subgoals) < 2:
+          if random() < self.prob_addsub or len(self.subgoals) < 2:
             self.add_subgoals()
-          return acted
 
       def add_subgoal(self, goaltype, *args):
           sig = (goaltype, args)
@@ -274,28 +276,30 @@ class MovementGoal:
 class Operate(TreeGoal):
       def __init_goal__(self):
           self.kill  = self.add_subgoal(KillEnemies)
-          self.heal  = self.add_subgoal(SetField, self.puppet, fields.LifeField, "-")
+          self.heal  = self.add_subgoal(SetField, self.puppet, LifeField, "-")
           self.dance = self.add_subgoal(AvoidFireballs)
           self.wayp  = self.add_subgoal(GotoWaypoint)
           self.band  = self.add_subgoal(FormBand)
           self.walk  = self.add_subgoal(WanderAround)
+          self.heat = self.prio = self.score = 1.0
       def dist_prio(self):
           hp = self.puppet.hp / self.puppet.initial_hp
+
           healprio  = self.scale_value(hp, ((0, 1.0), (0.1, 1.0), (0.3, 0.3), (0.8, 0.1), (1.0, 0.01)), smooth = True)
           fightprio = (1 - healprio) * 0.8
           walkprio  = (1 - healprio) * 0.2
+
           # healing first
           self.heal.prio  += healprio * self.prio * 0.5
           self.dance.prio += healprio * self.prio * 0.5
+
           # then fighting
           self.kill.prio  += fightprio * self.prio
-          # then other movements
+
+          # then movements
           self.wayp.prio += walkprio * self.prio * 0.45
           self.band.prio += walkprio * self.prio * 0.45
           self.walk.prio += walkprio * self.prio * 0.1
-          for g in self.subgoals:
-            g.dist_prio()
-      get_heat = TreeGoal.get_heat_maxchild
 
 class KillEnemies(TreeGoal):
       del_subgoals = TreeGoal.del_subgoals_limiting
@@ -332,12 +336,11 @@ class KillEnemies(TreeGoal):
             coef = self.prio / total
           for i in xrange(n_goals):
             self.subgoals[i].prio += prios[i] * coef
-            self.subgoals[i].dist_prio()
 
 class KillEnemy(TreeGoal):
       def __init_goal__(self, target):
           self.target = target
-          self.fireball = self.add_subgoal(SetField, self.target, fields.LifeField, "+")
+          self.fireball = self.add_subgoal(SetField, self.target, LifeField, "+")
           self.distance = self.add_subgoal(FightingDistance, self.target)
       def get_heat(self):
           if self.target.dead:
@@ -354,8 +357,6 @@ class KillEnemy(TreeGoal):
           else:
             self.fireball.prio += self.prio * 0.3
             self.distance.prio += self.prio * 0.7
-          self.fireball.dist_prio()
-          self.distance.dist_prio()
 
 class FightingDistance(Goal, MovementGoal):
       def __init_goal__(self, target):
@@ -386,27 +387,42 @@ class WanderAround(Goal, MovementGoal):
           self.move_to(self.puppet.pos + random() * 50 - 25)
 
 class FormBand(Goal, MovementGoal):
+      min_dist  = 10.0
+      save_time = 2.0
+      def __init_goal__(self):
+          self.saved_band_pos = self.puppet.pos
+          self.last_save_time = 0.0
+
       def band_pos(self):
+          if self.last_save_time > self.world.get_time() - self.save_time:
+            return self.saved_band_pos
+          # setup
           pos = self.puppet.pos
           avg     = 0.0
           closest = pos + 75.0
           friends = self.world.get_actors(pos - 75.0, pos + 75.0, include = [self.puppet.__class__])
           for friend in friends:
+            if friend == self.puppet:
+              continue
             avg += friend.pos / len(friends)
-            diff = friend.pos - pos
-            if abs(diff) < abs(closest):
+            if abs(friend.pos - pos) < abs(closest - pos):
               closest = friend.pos
 
           # do not get too tight
-          diff = closest - pos
-          if abs(diff) < 10.0:
-            return pos - (10.0 - diff)
-
+          diff = closest - pos + random() - 0.5
+          if abs(diff) < self.min_dist:
+            if diff > 0:
+              dst = pos - (self.min_dist - abs(diff)) - random()
+            else:
+              dst = pos + (self.min_dist - abs(diff)) + random()
+            self.saved_band_pos = dst
           # band together
-          if avg == 0:
-            return pos
+          elif avg == 0:
+            self.saved_band_pos = pos
           else:
-            return avg
+            self.saved_band_pos = avg
+          self.last_save_time = self.world.get_time()
+          return self.saved_band_pos
           
       def get_heat(self):
           diff = abs(self.band_pos() - self.puppet.pos)
@@ -415,7 +431,14 @@ class FormBand(Goal, MovementGoal):
           self.move_to(self.band_pos())
 
 class AvoidFireballs(Goal, MovementGoal):
+      save_time = 2.0
+      def __init_goal__(self):
+          self.saved_best_move = (0.0, self.puppet.pos)
+          self.last_save_time = 0.0
+
       def best_move(self):
+          if self.last_save_time > self.world.get_time() - self.save_time:
+            return self.saved_best_move
           pos  = self.puppet.pos
           base = self.puppet.LifeField.value(pos)
           values = [(ofs, self.puppet.LifeField.value(pos + ofs) - base) for ofs in [-15, -7, -3, +3, +7, +15]]
@@ -426,8 +449,10 @@ class AvoidFireballs(Goal, MovementGoal):
             if new_worth > worth:
               best  = pos + ofs
               worth = new_worth
+              self.saved_best_move = (worth, best)
           #print "base=%1.3f best=%u worth=%1.3f values=[%s]" % (base, int(best - pos), worth, " ".join(["%1.3f@%u" % (pair[1], pair[0]) for pair in values]))
-          return worth, best
+          self.last_save_time = self.world.get_time()
+          return self.saved_best_move
       def get_heat(self):
           worth, pos = self.best_move()
           return self.scale_value(worth, ((0, 0.01), (0.5, 0.3), (1, 1.0)), smooth = True)
@@ -457,8 +482,9 @@ class SetField(TreeGoal):
               self.add_subgoal(MoveBall, target, self.target)
             if not p:
               self.add_subgoal(PowerBall, target, self.value)
-
-          if len(targets) == 0:
+          
+          # if there are no balls or just to suprise
+          if len(targets) == 0 or random() > 0.95:
             self.add_subgoal(CreateBall, LifeBall)
       def get_heat(self):
           if len(self.subgoals) == 0:
@@ -491,7 +517,6 @@ class SetField(TreeGoal):
           coef = self.prio / total
           for i in xrange(n_goals):
             self.subgoals[i].prio += prios[i] * coef
-            self.subgoals[i].dist_prio()
       del_subgoals = TreeGoal.del_subgoals_limiting
 
 class CreateBall(Goal):

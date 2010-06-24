@@ -14,7 +14,6 @@ class Dude(Character):
       snd_move     = ["step", "cape1", "cape2"]
       snd_death    = ["cry"]
       stacking     = 25
-      in_dev_mode  = False
 
 class Villager(Dude):
       sprite_names = ["villager-left", "villager-right"]
@@ -34,7 +33,6 @@ class Dragon(Character):
       sprite_names = ["dragon-left", "dragon-right"]
       snd_move     = ["crackle1", "crackle2"]
       snd_death    = ["moan1", "moan2"]
-      in_dev_mode  = True
 
 class Guardian(Character):
       const_speed    = 1.0
