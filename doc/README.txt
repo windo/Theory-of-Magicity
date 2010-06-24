@@ -1,7 +1,8 @@
 --[ Theory of Magicity ]--
 
 For windows distribution, you should be able to just run the magicity.exe
-and the game should run.
+and the game should run. If you want to build the windows binary, you need
+python, pygame, py2exe, numpy and python-opengl.
 
 For real operating systems, you should make sure that you have pygame
 installed, for example, on Debian:

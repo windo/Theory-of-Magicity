@@ -7,9 +7,8 @@ version=$(cat VERSION)
 d="magicity-$version"
 
 mkdir $d
-cp -r img sound music font $d
-cp game.py actors.py graphics.py fields.py effects.py stories.py $d
-cp *.txt $d
+cp -r img sound music font lib doc $d
+cp game.py $d
 
 tar czf magicity-src-$version.tar.gz $d
 rm -rf $d

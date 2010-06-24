@@ -48,12 +48,10 @@ class BuildExe:
         self.icon_file = None
  
         #Extra files/dirs copied to game
-        self.extra_datas = ['img', 'sound', 'font', 'music',
-                            'LICENSE.txt', 'README.txt', 'TODO.txt',
-                           ]
+        self.extra_datas = ['img', 'sound', 'font', 'music', 'doc']
  
         #Extra/excludes python modules
-        self.extra_modules = []
+        self.extra_modules = ['numpy']
         self.exclude_modules = []
         
         #DLL Excludes

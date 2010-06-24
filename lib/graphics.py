@@ -2,13 +2,15 @@ import pygame
 from pygame.locals import *
 
 global screen
-use_opengl = False
 
-if use_opengl:
+try:
   import OpenGL
   OpenGL.ERROR_CHECKING = False
   from OpenGL.GL import *
   from OpenGL.GLU import *
+  use_opengl = True
+except:
+  use_opengl = False
 
 class glFont(pygame.font.Font):
       def render(self, txt, antialias, color):
