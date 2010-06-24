@@ -55,7 +55,7 @@ def get_circle(color, radius, screen = False, blur = 0):
       # optimize for screen
       if screen:
         s = s.convert_alpha(screen)
-      s = graphics.glImg(s)
+      s = graphics.image(s)
 
       # save to cache
       circle_cache[(color, radius, blur)] = s

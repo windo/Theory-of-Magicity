@@ -1,0 +1,36 @@
+Simple rule-based AI
+
+Input:
+ * nearby characters
+  * their position
+  * their hp
+  * friend/neutral/enemy
+ * nearby magic
+  * their position
+  * their type
+  * their value
+ * magic fields
+  * sparse values
+
+Output:
+ * self stop/left/right
+ * create/select/free magic
+ * selected magic left/right/up/down
+
+Goals:
+ * stay_alive
+  
+ * hpreduce @actor
+  * (1.0) +LifeField @ position
+ * hprevive
+  * (1.0) -LifeField @ position
+  * (0.5) move @actor -> -LifeField IF self
+
+Actions:
+ * get *Ball for @pos, proc:
+  * select *Ball near @pos
+  * create *Ball @self
+ * move Ball @pos, proc:
+  * estimate speed
+  * left/right depending on speed -> @pos
+ * move 

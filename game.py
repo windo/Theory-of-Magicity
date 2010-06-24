@@ -2,20 +2,14 @@
 
 import time, sys, math, types
 from random import random
-from operator import attrgetter
 
 # pygame
 import pygame
 from pygame.locals import *
 
-# openGL
-import OpenGL
-OpenGL.ERROR_CHECKING = False
-from OpenGL.GL import *
-from OpenGL.GLU import *
-
 # game libraries
-import actors, fields, stories, graphics, effects
+from lib import *
+from lib.stories import campaign, testlevels
 
 class ResourceLoader:
       """
@@ -29,16 +23,15 @@ class ResourceLoader:
             def __str__(self):
                 return "No Image %s" % (self.name) 
 
-      def __init__(self, screen, opengl = True):
+      def __init__(self, screen):
           self.spritelists = {}
           self.imagelist   = {}
           self.soundlist   = {}
           self.screen      = screen
-          self.use_opengl  = opengl
 
           # load fonts
           self.spritelists["dummyfont"] = []
-          font = graphics.glFont
+          font = graphics.Font
           self.biggoth   = font("font/Deutsch.ttf", 104)
           self.smallgoth = font("font/Deutsch.ttf", 56)
           self.textfont  = font("font/angltrr.ttf", 20)
@@ -109,8 +102,7 @@ class ResourceLoader:
             img = self.scale(img, resize)
           # TODO: does this help at all?
           #img = img.convert_alpha(self.screen)
-          if self.use_opengl:
-            img = graphics.glImg(img)
+          img = graphics.image(img)
           self.spritelists[listname].append(img)
           return img
 
@@ -153,8 +145,9 @@ class View:
           """
           # screen / plane
           self.screen = screen
-          self.blit   = self.opengl_blit
-          self.fill   = graphics.glfill
+          self.blit   = graphics.blit
+          self.fill   = graphics.fill
+          self.rect   = graphics.rect
 
           self.view   = [screen.get_width(), screen.get_height()]
           self.plane  = list(plane)
@@ -194,14 +187,6 @@ class View:
           return (x - self.offset_x) / self.mult_x
       def pl2sc_y(self, y):
           return (y - self.offset_y) / self.mult_y
-
-      # draw
-      def plain_blit(self, img, coords):
-          self.screen.blit(img, coords)
-      def opengl_blit(self, img, coords):
-          glLoadIdentity()
-          glTranslate(coords[0], coords[1], 0)
-          glCallList(img.genlist)
 
       # camera stuff
       def get_center_x(self):
@@ -275,7 +260,6 @@ class View:
             else:
               const = 1.0
             self.move_x(diff * const * timediff / self.find_time)
-
 
 class World:
       """
@@ -383,21 +367,8 @@ class Game:
 
           # screen params
           screensize  = (1024, 768)
-          flags       = FULLSCREEN | HWSURFACE | DOUBLEBUF | OPENGL
-          self.screen = pygame.display.set_mode(screensize, flags)
+          self.screen = graphics.init_screen(*screensize)
           self.view   = View(self.screen, (0, 100, 0, 50))
-          
-          glClearColor(0.0, 0.0, 0.0, 1.0)
-          glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
-
-          glMatrixMode(GL_PROJECTION)
-          glLoadIdentity();
-          gluOrtho2D(0, screensize[0], screensize[1], 0)
-          glMatrixMode(GL_MODELVIEW)
-
-          glEnable(GL_TEXTURE_2D)
-          glEnable(GL_BLEND)
-          glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
           # loading resources
           self.loader = ResourceLoader(self.screen)
@@ -409,14 +380,16 @@ class Game:
           
 
       story_menu = [
-                    stories.Shepherd.gen_menuitem(),
-                    stories.Massacre.gen_menuitem(),
-                    stories.Blockade.gen_menuitem(),
-                    stories.Siege.gen_menuitem(),
+                    stories.campaign.Shepherd.gen_menuitem(),
+                    stories.campaign.Massacre.gen_menuitem(),
+                    stories.campaign.Blockade.gen_menuitem(),
+                    stories.campaign.Siege.gen_menuitem(),
                    { "action": "exit", "txt": "Return" },
                    ]
       test_menu = [
-                   stories.TestBed.gen_menuitem(),
+                   stories.testlevels.TestBed.gen_menuitem(),
+                   stories.testlevels.MassHunting.gen_menuitem(),
+                   stories.testlevels.MassBehaving.gen_menuitem(),
                    { "action": "exit", "txt": "Return" },
                   ]
       title_menu = [
@@ -468,8 +441,7 @@ class Game:
             for item in menu:
               self.center_blit(item[item["seq"] == select and "high" or "low"], 0, item["pos"])
             # set on screen
-            glFlush()
-            pygame.display.flip()
+            graphics.update()
 
             # events
             for event in pygame.event.get():
@@ -558,14 +530,14 @@ class Game:
             update_stime = actors_stime = time.time()
             # actors moving
             if not world.paused():
-              for actor in world.get_actors(exclude = [fields.MagicParticle]):
+              for actor in world.get_actors(exclude = [actors.MagicParticle]):
                 actor.update()
             update_actors_time = time.time() - actors_stime
 
             magic_stime = time.time()
             # magic moving
             if not world.paused():
-              for actor in world.get_actors(include = [fields.MagicParticle]):
+              for actor in world.get_actors(include = [actors.MagicParticle]):
                 actor.update()
             update_magic_time = time.time() - magic_stime
 
@@ -576,13 +548,12 @@ class Game:
           
             # center view on player
             view.update()
-
             update_time = time.time() - update_stime
           
-            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
-            glLoadIdentity() 
             ## draw
+            graphics.clear()
             draw_stime = bg_stime = time.time()
+            total_actor_count = total_magic_count = draw_actor_count = draw_magic_count = 0
             # background changes slightly in color
             if world.paused():
               day = -1.0
@@ -597,13 +568,17 @@ class Game:
             sort_time = time.time() - sort_stime
 
             actors_stime = time.time()
-            for actor in world.get_actors(exclude = [fields.MagicParticle]):
-              actor.draw(draw_debug)
+            for actor in world.get_actors(exclude = [actors.MagicParticle]):
+              total_actor_count += 1
+              if actor.draw(draw_debug):
+                draw_actor_count += 1
             draw_actors_time = time.time() - actors_stime
             # magicparticles
             magic_stime = time.time()
-            for actor in world.get_actors(include = [fields.MagicParticle]):
-              actor.draw(draw_debug)
+            for actor in world.get_actors(include = [actors.MagicParticle]):
+              total_magic_count += 1
+              if actor.draw(draw_debug):
+                draw_magic_count += 1
             draw_magic_time = time.time() - magic_stime
 
             # draw fields
@@ -620,9 +595,10 @@ class Game:
             if draw_debug:
               if int(time.time()) != lasttime or not fps_img:
                 fps_txt        = "FPS: %.1f" % (fps)
-                draw_times_txt = "DRAW=%.3f (fields=%.3f sort=%.3f actors=%.3f magic=%.3f misc=%.3f)" % \
+                draw_times_txt = "DRAW=%.3f (fields=%.3f sort=%.3f actors=%.3f magic=%.3f misc=%.3f) actors=%u/%u balls=%u/%u" % \
                                  (draw_time * 1000, draw_fields_time * 1000, sort_time * 1000,
-                                 draw_actors_time * 1000, draw_magic_time * 1000, draw_misc_time * 1000)
+                                 draw_actors_time * 1000, draw_magic_time * 1000, draw_misc_time * 1000,
+                                 draw_actor_count, total_actor_count, draw_magic_count, total_magic_count)
                 update_times_txt = "UPDATE=%.3f (actors=%.3f magic=%.3f story=%.3f) display.update=%.3f actors=%u, cch=%u, ccm=%u" % \
                                    (update_time * 1000, update_actors_time * 1000, update_magic_time * 1000,
                                     update_story_time * 1000, update_display_time * 1000,
@@ -642,7 +618,7 @@ class Game:
             # draw magic selection
             if get_magic:
               i = 1
-              local_balls = world.get_actors(player.pos - 100, player.pos + 100, include = [ fields.MagicParticle ])
+              local_balls = world.get_actors(player.pos - 100, player.pos + 100, include = [ actors.MagicParticle ])
               for ball in local_balls:
                 ball_txt = world.loader.textfont.render("%u: %s" % (i, str(ball.__class__).split(".")[1]), True, ball.field.color)
                 ball_nr  = world.loader.textfont.render("%u" % (i), True, ball.field.color)
@@ -654,8 +630,7 @@ class Game:
             
             # drawing done!
             display_stime = time.time()
-            glFlush()
-            pygame.display.flip()
+            graphics.update()
             update_display_time = time.time() - display_stime
           
             ## handle events
@@ -708,19 +683,19 @@ class Game:
                 elif event.key == K_z:
                   if sel_magic:
                     sel_magic.selected = False
-                  sel_magic = player.magic.new(fields.TimeBall)
+                  sel_magic = player.magic.new(actors.TimeBall)
                   sel_magic.selected = True
                   casting = False
                 elif event.key == K_x:
                   if sel_magic:
                     sel_magic.selected = False
-                  sel_magic = player.magic.new(fields.WindBall)
+                  sel_magic = player.magic.new(actors.WindBall)
                   sel_magic.selected = True
                   casting = False
                 elif event.key == K_c:
                   if sel_magic:
                     sel_magic.selected = False
-                  sel_magic = player.magic.new(fields.LifeBall)
+                  sel_magic = player.magic.new(actors.LifeBall)
                   sel_magic.selected = True
                   casting = False
 
@@ -804,7 +779,7 @@ class Game:
               elif event.type == MOUSEBUTTONDOWN:
                 if event.button == 1:
                   pos = view.sc2pl_x(event.pos[0])
-                  particles = world.get_actors(pos - 5, pos + 5, include = [fields.MagicParticle])
+                  particles = world.get_actors(pos - 5, pos + 5, include = [actors.MagicParticle])
                   if particles:
                     # find the closest particle
                     closest = 5
@@ -825,12 +800,12 @@ class Game:
 
                 elif event.button == 3:
                   pos = view.sc2pl_x(event.pos[0])
-                  actors = world.get_actors(pos - 5, pos + 5)
-                  if actors:
+                  candidates = world.get_actors(pos - 5, pos + 5)
+                  if candidates:
                     # find the closest particle
                     closest = 5
                     select  = False
-                    for actor in actors:
+                    for actor in candidates:
                       dist = abs(actor.pos - pos)
                       if dist < closest:
                         closest = dist
