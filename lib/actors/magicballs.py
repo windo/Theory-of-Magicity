@@ -119,26 +119,26 @@ class MagicParticle(Actor):
           radius = 25 
           x      = self.world.view.pl2sc_x(self.pos)
           y      = self.world.view.sc_h() - self.hover_height
-          s = effects.get_circle((255, 255, 255, 64), radius, view.screen, blur = 15)
-          view.blit(s, (x - radius, y - radius))
+          s = effects.get_circle((255, 255, 255, 64), radius, view.graphics, blur = 15)
+          self.world.view.graphics.blit(s, (x - radius, y - radius))
 
           # draw field effects
           for fx in self.particle_effects:
-            fx.draw(view.screen, draw_debug)
+            fx.draw(view.graphics, draw_debug)
             
           # if it's selected
           if self.selected:
             radius = 50
-            s = effects.get_circle((255, 255, 255, 16), radius, view.screen)
-            view.blit(s, (x - radius, y - radius))
+            s = effects.get_circle((255, 255, 255, 16), radius, view.graphics)
+            self.world.view.graphics.blit(s, (x - radius, y - radius))
             # affects
-            s = effects.get_circle((255, 255, 255, 64), 5, view.screen, 2)
+            s = effects.get_circle((255, 255, 255, 64), 5, view.graphics, 2)
             for caster in self.affects:
               accel, mult = caster.affect_particle(self)
               for i in xrange(5):
                 xdiff = accel * 55.0 / 10 / 5 * i
                 ydiff = mult  * 55.0 / 10 / 5 * i
-                view.blit(s, (x - 5 + xdiff, y - 5 - ydiff))
+                self.world.view.graphics.blit(s, (x - 5 + xdiff, y - 5 - ydiff))
           return True
 
 class TimeBall(MagicParticle):

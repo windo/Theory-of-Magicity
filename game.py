@@ -26,17 +26,17 @@ class Game:
           self.clock  = pygame.time.Clock()
 
           # screen params
-          screensize  = (1024, 768)
-          self.screen = graphics.init_screen(*screensize)
-          self.view   = game.View(self.screen, (0, 100, 0, 50))
+          screensize    = (1024, 768)
+          self.graphics = graphics.default_provider(*screensize)
+          self.view     = game.View(self.graphics, (0, 100, 0, 50))
 
           # loading resources
-          self.loader = game.ResourceLoader(self.screen)
+          self.loader = game.ResourceLoader(self.graphics)
           # for title screen
           self.loader.sprite("title-bg", "title-bg", resize = screensize)
 
       def center_blit(self, img, x, y):
-          self.view.blit(img, (self.view.sc_w() / 2 - img.get_width() / 2 + x, y))
+          self.graphics.blit(img, (self.view.sc_w() / 2 - img.get_width() / 2 + x, y))
 
       story_menu = [
                     stories.campaign.Shepherd.gen_menuitem(),
@@ -93,14 +93,14 @@ class Game:
 
           while forever:
             # graphics
-            self.view.blit(background, (0, 0))
+            self.graphics.blit(background, (0, 0))
             self.center_blit(titleshadow, 5, 25)
             self.center_blit(title, 0, 20)
             # menu
             for item in menu:
               self.center_blit(item[item["seq"] == select and "high" or "low"], 0, item["pos"])
             # set on screen
-            graphics.update()
+            self.graphics.update()
 
             # events
             for event in pygame.event.get():
@@ -140,10 +140,32 @@ class Game:
             # calibration loop
             self.clock.tick(45)
 
+      def run_test(self, Story):
+          world = game.World(self.loader, fields.all, self.view)
+          story = Story(world)
+
+          forever = True
+          while forever:
+            for actor in world.get_actors():
+              actor.update()
+            story.update()
+            self.view.update()
+            for fieldtype in world.fields.keys():
+              world.fields[fieldtype].update()
+
+            if story.game_over: forever = False
+            for event in pygame.event.get():
+              if event.type == QUIT:
+                forever = False
+              if event.type == KEYDOWN and event.key == K_ESCAPE:
+                forever = False
+
+          return story.game_result
+
       def run_story(self, Story):
           # set the game up, convenience references (without self.)
           view   = self.view
-          screen = self.screen
+          screen = self.graphics.screen
           world  = game.World(self.loader, fields.all, view)
           story  = Story(world)
           player = story.player()
@@ -213,16 +235,16 @@ class Game:
             update_time = time.time() - update_stime
           
             ## draw
-            graphics.clear()
+            self.graphics.clear()
             draw_stime = bg_stime = time.time()
             total_actor_count = total_magic_count = draw_actor_count = draw_magic_count = 0
             # background changes slightly in color
             if world.paused():
               day = -1.0
-              view.fill([16, 32, 96])
+              self.graphics.fill([16, 32, 96])
             else:
               day = math.sin(time.time()) + 1
-              view.fill([day * 32, 32 + day * 32, 128 + day * 32])
+              self.graphics.fill([day * 32, 32 + day * 32, 128 + day * 32])
 
             # draw actors
             sort_stime = time.time()
@@ -270,12 +292,12 @@ class Game:
                 fps_img      = font.render(fps_txt, True, color)
                 draw_times   = font.render(draw_times_txt, True, color)
                 update_times = font.render(update_times_txt, True, color)
-              view.fill((0,0,0), (10, 10, fps_img.get_width(), fps_img.get_height()))
-              view.fill((0,0,0), (10, 30, draw_times.get_width(), draw_times.get_height()))
-              view.fill((0,0,0), (10, 50, update_times.get_width(), update_times.get_height()))
-              view.blit(fps_img, (10, 10))
-              view.blit(draw_times, (10, 30))
-              view.blit(update_times, (10, 50))
+              self.graphics.fill((0,0,0), (10, 10, fps_img.get_width(), fps_img.get_height()))
+              self.graphics.fill((0,0,0), (10, 30, draw_times.get_width(), draw_times.get_height()))
+              self.graphics.fill((0,0,0), (10, 50, update_times.get_width(), update_times.get_height()))
+              self.graphics.blit(fps_img, (10, 10))
+              self.graphics.blit(draw_times, (10, 30))
+              self.graphics.blit(update_times, (10, 50))
             
             # draw magic selection
             if get_magic:
@@ -284,21 +306,20 @@ class Game:
               for ball in local_balls:
                 ball_txt = world.loader.textfont.render("%u: %s" % (i, str(ball.__class__).split(".")[1]), True, ball.field.color)
                 ball_nr  = world.loader.textfont.render("%u" % (i), True, ball.field.color)
-                view.blit(ball_txt, (10, 40 + i * 20))
-                view.blit(ball_nr, (view.pl2sc_x(ball.pos), view.sc_h() - 80))
+                self.graphics.blit(ball_txt, (10, 40 + i * 20))
+                self.graphics.blit(ball_nr, (view.pl2sc_x(ball.pos), view.sc_h() - 80))
                 i += 1
             draw_misc_time = time.time() - misc_stime
             draw_time = time.time() - draw_stime
             
             # drawing done!
             display_stime = time.time()
-            graphics.update()
+            self.graphics.update()
             update_display_time = time.time() - display_stime
           
             ## handle events
             for event in pygame.event.get():
-              if event.type == QUIT:
-                forever = False
+              if event.type == QUIT: forever = False
               
               ## keyboard
               # key events
@@ -495,11 +516,19 @@ class Game:
               fps = (frames - lastframes)
               lasttime   = int(time.time())
               lastframes = frames
+
+          return story.game_result
           
 if __name__ == "__main__":
    g = Game()
-   if len(sys.argv) >= 2 and sys.argv[1] == "--profile":
-     import cProfile
-     cProfile.run("g.title_screen()", "game.stats")
+   if len(sys.argv) >= 2:
+     if sys.argv[1] == "--profile":
+       import cProfile
+       cProfile.run("g.title_screen()", "game.stats")
+     elif sys.argv[1] == "--test":
+       testname = sys.argv[2]
+       test = [item['action'] for item in g.test_menu if item['txt'] == testname][0]
+       g.run_test(test)
+
    else:
      g.title_screen()

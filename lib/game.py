@@ -1,7 +1,6 @@
 import pygame, time
 
 from actors import Actor
-import graphics
 
 class ResourceLoader:
       """
@@ -15,11 +14,11 @@ class ResourceLoader:
             def __str__(self):
                 return "No Image %s" % (self.name) 
 
-      def __init__(self, screen):
+      def __init__(self, graphics):
           self.spritelists = {}
           self.imagelist   = {}
           self.soundlist   = {}
-          self.screen      = screen
+          self.graphics    = graphics
 
           # load fonts
           self.spritelists["dummyfont"] = []
@@ -94,7 +93,7 @@ class ResourceLoader:
             img = self.scale(img, resize)
           # TODO: does this help at all?
           #img = img.convert_alpha(self.screen)
-          img = graphics.image(img)
+          img = self.graphics.image(img)
           self.spritelists[listname].append(img)
           return img
 
@@ -130,18 +129,15 @@ class View:
       Viewport/scale to use for translating in-game coordinates to screen coordinates
       and vice versa
       """
-      def __init__(self, screen, plane):
+      def __init__(self, graphics, plane):
           """
           view is (width, height) - input/output scale
           plane is (x1, y1, x2, y2) - the MagicField area to fit in the view
           """
           # screen / plane
-          self.screen = screen
-          self.blit   = graphics.blit
-          self.fill   = graphics.fill
-          self.rect   = graphics.rect
+          self.graphics = graphics
 
-          self.view   = [screen.get_width(), screen.get_height()]
+          self.view   = [graphics.screen.get_width(), graphics.screen.get_height()]
           self.plane  = list(plane)
           self.recalculate()
           # camera

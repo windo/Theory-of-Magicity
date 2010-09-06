@@ -1,11 +1,14 @@
 from lib import fields, actors
 from random import random
 
+from lib.debug import dbg
+
 class Story:
       menuname  = "Blank Story Name"
       themesong = "happytheme"
 
       def __init__(self, world):
+          dbg("Starting a story")
           self.world = world
           # story state
           self.game_over   = False
@@ -117,12 +120,12 @@ class Story:
           pass
 
       def draw(self, draw_debug = False):
-          view = self.world.view
+          g = self.world.view.graphics
           # draw game over
           if self.game_over:
-            view.blit(self.game_over_img,
-                      (self.world.view.sc_w() / 2 - self.game_over_img.get_width() / 2,
-                       self.world.view.sc_h() / 2 - self.game_over_img.get_height() / 2 - 100))
+            g.blit(self.game_over_img,
+                   (self.world.view.sc_w() / 2 - self.game_over_img.get_width() / 2,
+                    self.world.view.sc_h() / 2 - self.game_over_img.get_height() / 2 - 100))
 
           # proccess narratives
           draw_list    = []
@@ -155,5 +158,5 @@ class Story:
           # draw them
           line_y = 10 + extra_offset
           for img in draw_list:
-            view.blit(img, (10, line_y))
+            g.blit(img, (10, line_y))
             line_y += img.get_height() + 5

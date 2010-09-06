@@ -9,7 +9,7 @@ class Planner(Controller):
       """
       Container for planning controller
       """
-      control_interval = 0.1
+      control_interval = 0.05
       def __init__(self, *args):
           Controller.__init__(self, *args)
           self.goals   = {}
@@ -109,17 +109,19 @@ class Goal:
           self.__init_goal__(*args)
 
       def __str__(self):
-          return "%s(%s: h=%1.3f, p=%1.3f, s=%1.3f)" % \
-                 (self.__class__.__name__, self.goal_args, self.heat, self.prio, self.score)
+          return "%s((%s): h=%1.3f, p=%1.3f, s=%1.3f)" % \
+                 (self.__class__.__name__, ", ".join([str(a) for a in self.goal_args]), self.heat, self.prio, self.score)
+      def __repr__(self):
+          return self.__str__()
       def debug_info(self, depth = 0):
-          info = " " * depth + ">%s\n" % (str(self))
+          info = "\\" * depth + "-> %s\n" % (self.__str__())
           for subgoal in self.subgoals:
             info += subgoal.debug_info(depth + 1)
           return info
 
       def __init_goal__(self, *args):
           """
-          Should be overloaded if there are meaningful arguments for the goal
+          Should be overloaded if there are meaningful arguments for the goal constructor
           """
           pass
       def get_heat(self):
@@ -129,7 +131,7 @@ class Goal:
           close to 0 when goal is satisfied, no action required
           close to 1 when action is required to fulfill satisfy the goal
           """
-          raise Exception(str(self.__class__))
+          raise Exception(str(self.__class__.__name__))
       def dist_prio(self):
           """
           Distribute amount of attention between subgoals
@@ -183,7 +185,9 @@ class TreeGoal(Goal):
           # organize subgoals by score
           self.dist_prio()
           for goal in self.subgoals:
-            goal.heat  = goal.get_heat()
+            # do not constantly check heat of unimportant goals
+            if random() < max(goal.heat, 0.1):
+              goal.heat  = goal.get_heat()
             goal.score = goal.heat * goal.prio
           self.subgoals.sort(lambda x, y: cmp(y.score, x.score))
           totalscore = self.del_subgoals()
@@ -227,7 +231,7 @@ class TreeGoal(Goal):
           return sum([g.score for g in self.subgoals])
 
       def dist_prio(self):
-          raise Exception(str(self.__class__))
+          raise Exception(str(self.__class__.__name__))
 
       # useful implementations
       def get_heat_maxchild(self):
@@ -376,7 +380,7 @@ class FightingDistance(Goal, MovementGoal):
 class GotoWaypoint(Goal, MovementGoal):
       def get_heat(self):
           diff = abs(self.controller.waypoint - self.puppet.pos)
-          return self.scale_value(diff, ((0, 0.01), (5, 0.1), (15, 0.2), (50, 0.5), (75, 1.0)))
+          return self.scale_value(diff, ((0, 0.01), (15, 0.1), (50, 0.5), (75, 1.0)), smooth = True)
       def update(self):
           self.move_to(self.controller.waypoint)
 
@@ -426,7 +430,7 @@ class FormBand(Goal, MovementGoal):
           
       def get_heat(self):
           diff = abs(self.band_pos() - self.puppet.pos)
-          return self.scale_value(diff, ((0, 0.01), (2, 0.1), (10, 0.5), (25, 1.0)))
+          return self.scale_value(diff, ((0, 0.01), (2, 0.1), (10, 0.5), (25, 1.0)), smooth = True)
       def update(self):
           self.move_to(self.band_pos())
 

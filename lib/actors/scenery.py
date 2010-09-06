@@ -44,7 +44,7 @@ class Background(Drawable):
           offset = (view.pl2sc_x(0) / self.distance) % bg_w - bg_w 
           count  = int(view.sc_w() / bg_w) + 2 
           for i in xrange(count):
-            view.blit(img, (offset + i * bg_w, view.sc_h() - bg_h))
+            self.world.view.graphics.blit(img, (offset + i * bg_w, view.sc_h() - bg_h))
 
 class BackgroundHills(Background):
       sprite_names = ["hills"]

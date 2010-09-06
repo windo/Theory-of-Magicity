@@ -83,9 +83,9 @@ class MagicField:
                 # color of the line segment
                 alpha = min(192, abs(value) * 256 * 8)
                 color = self.color + (alpha,)
-                s = effects.get_circle(color, min(5, abs(value) * 100), view.screen, 3)
+                s = effects.get_circle(color, min(5, abs(value) * 100), view.graphics, 3)
                 ypos = view.sc_h() - (value + 1.0) * view.sc_h() / 2.0
-                view.blit(s, (pos - step + j * step / self.interpolate, ypos))
+                view.graphics.blit(s, (pos - step + j * step / self.interpolate, ypos))
 
             # draw debug
             if draw_debug and i % (self.draw_real_points / 5) == 0 and abs(cur) > 0.01:
@@ -93,7 +93,7 @@ class MagicField:
               txt = "%s.value(%.2f:%.2f) = %.2f" % (str(self), i, at, next)
               txt = self.loader.debugfont.render(txt, True, (255, 255, 255))
               ypos = view.sc_h() - (next + 1.0) * view.sc_h() / 2.0
-              view.blit(txt, (pos, ypos))
+              view.graphics.blit(txt, (pos, ypos))
 
             # next interpolation
             cur = next

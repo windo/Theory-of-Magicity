@@ -7,7 +7,7 @@ import graphics
 global circle_cache, circle_cache_hit, circle_cache_miss
 circle_cache = {}
 circle_cache_hit = circle_cache_miss = 0
-def get_circle(color, radius, screen = False, blur = 0):
+def get_circle(color, radius, graphics, blur = 0):
     global circle_cache, circle_cache_hit, circle_cache_miss
     # color accuracy
     c = tuple()
@@ -53,8 +53,8 @@ def get_circle(color, radius, screen = False, blur = 0):
               alphas[2 * center - 1 - y][2 * center - 1 - x] = alpha
 
       # optimize for screen
-      if screen:
-        s = s.convert_alpha(screen)
+      if graphics:
+        s = s.convert_alpha(graphics.screen)
       s = graphics.image(s)
 
       # save to cache
@@ -121,7 +121,7 @@ class ParticleEffect:
               dot.hover = self.magic.hover_height
             self.dots.append(dot)
             
-      def draw(self, screen, draw_debug = False):
+      def draw(self, graphics, draw_debug = False):
           if self.magic:
             now = self.magic.world.get_time()
           else:
@@ -133,16 +133,16 @@ class ParticleEffect:
               color        = self.get_color(dot)
               radius, blur = self.get_radius(dot)
               # TODO: there really should be a better way to do this (but apparently there isn't?)
-              s = get_circle(color, radius, screen, blur)
+              s = get_circle(color, radius, graphics, blur)
               dot.ts  = now
               dot.img = s
             if self.magic:
               view = self.magic.world.view
               x = view.pl2sc_x(dot.pos) + dot.x - s.get_width() / 2
               y = view.sc_h() - dot.hover + dot.y - s.get_height() / 2
-              view.blit(s, (x, y))
+              view.graphics.blit(s, (x, y))
             else:
-              screen.blit(s, (dot.x + self.xofs - s.get_width() / 2, 100 + dot.y - s.get_height() / 2))
+              graphics.blit(s, (dot.x + self.xofs - s.get_width() / 2, 100 + dot.y - s.get_height() / 2))
 
 # A template
 class Dummy(ParticleEffect):

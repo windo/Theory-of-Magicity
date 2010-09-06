@@ -131,7 +131,7 @@ class Drawable:
               txts.append(self.world.loader.debugfont.render(line, True, (255, 255, 255)))
             i = 0
             for txt in txts:
-              view.blit(txt, (x, 70 + i * 20))
+              self.world.view.graphics.blit(txt, (x, 70 + i * 20))
               i += 1
 
           # do not draw/animate spriteless actors
@@ -157,7 +157,7 @@ class Drawable:
 
           # actual drawing
           img = imglist[self.cur_img_idx]
-          view.blit(img, (x - self.img_w / 2, y))
+          self.world.view.graphics.blit(img, (x - self.img_w / 2, y))
 
           return True
 
@@ -346,8 +346,8 @@ class Actor(Drawable):
             hp_color  = (64, 255, 64)
             hp_border = (x - 15, y, 30, 3)
             hp_fill   = (x - 15, y, 30 * (self.hp / self.initial_hp), 3)
-            self.world.view.rect(hp_color, hp_border, 1)
-            self.world.view.rect(hp_color, hp_fill, 0)
+            self.world.view.graphics.rect(hp_color, hp_border, 1)
+            self.world.view.graphics.rect(hp_color, hp_fill, 0)
             return True
           return ret
 
@@ -461,7 +461,7 @@ class Background(Drawable):
           offset = (view.pl2sc_x(0) / self.distance) % bg_w - bg_w 
           count  = int(view.sc_w() / bg_w) + 2 
           for i in xrange(count):
-            view.blit(img, (offset + i * bg_w, view.sc_h() - bg_h))
+            self.world.view.graphics.blit(img, (offset + i * bg_w, view.sc_h() - bg_h))
           return True
 
 # controllers
