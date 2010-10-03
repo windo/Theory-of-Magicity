@@ -37,14 +37,14 @@ class Background(Drawable):
       stacking = 2
 
       def draw(self, draw_debug = False): 
-          img    = self.img_list[0]
-          bg_w   = img.get_width() 
-          bg_h   = img.get_height()
-          view   = self.world.view
-          offset = (view.pl2sc_x(0) / self.distance) % bg_w - bg_w 
-          count  = int(view.sc_w() / bg_w) + 2 
+          img  = self.img_list[0]
+          bg_w = img.get_width() 
+          bg_h = img.get_height()
+          cam  = self.world.camera
+          offset = (cam.pl2sc_x(0) / self.distance) % bg_w - bg_w 
+          count  = int(cam.sc_w() / bg_w) + 2 
           for i in xrange(count):
-            self.world.view.graphics.blit(img, (offset + i * bg_w, view.sc_h() - bg_h))
+            cam.graphics.blit(img, (offset + i * bg_w, cam.sc_h() - bg_h))
 
 class BackgroundHills(Background):
       sprite_names = ["hills"]

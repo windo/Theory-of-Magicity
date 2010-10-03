@@ -1,6 +1,7 @@
 import math, time
 from random import random
 from lib import fields
+from lib.resources import Resources
 
 class Drawable:
       """
@@ -32,8 +33,9 @@ class Drawable:
       in_dev_mode    = False
 
       def __init__(self, world, pos):
-          self.world  = world
-          self.id     = world.next_actor_id()
+          self.world = world
+          self.id    = world.next_actor_id()
+          self.rsc   = Resources() 
           # movement params
           self.pos    = pos
           self.speed  = 0.0
@@ -54,13 +56,13 @@ class Drawable:
           # load images
           if len(self.sprite_names):
             if self.directed:
-              self.img_left  = world.loader.get_spritelist(self.sprite_names[0])
-              self.img_right = world.loader.get_spritelist(self.sprite_names[1])
+              self.img_left  = self.rsc.sprites[self.sprite_names[0]]
+              self.img_right = self.rsc.sprites[self.sprite_names[1]]
               self.img_count = len(self.img_left)
               self.img_w     = self.img_left[0].get_width()
               self.img_h     = self.img_left[0].get_height()
             else:
-              self.img_list  = world.loader.get_spritelist(self.sprite_names[0])
+              self.img_list  = self.rsc.sprites[self.sprite_names[0]]
               self.img_count = len(self.img_list)
               self.img_w     = self.img_list[0].get_width()
               self.img_h     = self.img_list[0].get_height()
@@ -95,9 +97,9 @@ class Drawable:
           x - center of image
           y - top edge of image
           """
-          view = self.world.view
+          cam = self.world.camera
           # center of image
-          x = view.pl2sc_x(self.pos) / self.distance
+          x = cam.pl2sc_x(self.pos) / self.distance
 
           # hovering in air (slightly wobbling up and down)
           if self.hover_height:
@@ -107,9 +109,9 @@ class Drawable:
             hover = 0.0
           
           # top edge
-          y = view.pl2sc_y(self.ypos) / self.distance + hover + self.base_height
+          y = cam.pl2sc_y(self.ypos) / self.distance + hover + self.base_height
           if not self.from_ceiling:
-            y = view.sc_h() - self.img_h - y
+            y = cam.sc_h() - self.img_h - y
 
           return x, y
       def draw(self, draw_debug = False):
@@ -117,10 +119,10 @@ class Drawable:
           Draw the image on screen, called in sequence from main game loop for each actor
           """
           x, y = self.get_xy()
-          view = self.world.view
+          cam = self.world.camera
 
           # do not draw off-the screen actors
-          if x + self.img_w / 2 < 0 or x - self.img_w / 2 > self.world.view.sc_w():
+          if x + self.img_w / 2 < 0 or x - self.img_w / 2 > cam.sc_w():
             return False
 
           # draw debugging information
@@ -128,10 +130,10 @@ class Drawable:
             lines = self.debug_info().split("\n")
             txts  = []
             for line in lines:
-              txts.append(self.world.loader.debugfont.render(line, True, (255, 255, 255)))
+              txts.append(self.rsc.fonts.debugfont.render(line, True, (255, 255, 255)))
             i = 0
             for txt in txts:
-              self.world.view.graphics.blit(txt, (x, 70 + i * 20))
+              cam.graphics.blit(txt, (x, 70 + i * 20))
               i += 1
 
           # do not draw/animate spriteless actors
@@ -151,13 +153,13 @@ class Drawable:
 
           # to animate or not to animate
           if self.animate:
-            self.cur_img_idx = int(time.time() * self.img_count * self.anim_speed) % self.img_count
+            self.cur_img_idx = int((self.rnd_time_offset + time.time()) * self.img_count * self.anim_speed) % self.img_count
           else:
             self.cur_img_idx = 0
 
           # actual drawing
           img = imglist[self.cur_img_idx]
-          self.world.view.graphics.blit(img, (x - self.img_w / 2, y))
+          cam.graphics.blit(img, (x - self.img_w / 2, y))
 
           return True
 
@@ -232,18 +234,18 @@ class Actor(Drawable):
 
       # play sounds - called from other parts of the class (update() for example)
       def in_range(self):
-          return self.pos > self.world.view.pl_x1() and self.pos < self.world.view.pl_x2()
+          return self.pos > self.world.camera.pl_x1() and self.pos < self.world.camera.pl_x2()
       def movement_sound(self):
           if self.snd_move and self.in_range() and self.next_sound < self.world.get_time():
             self.next_sound = self.world.get_time() + 1.0 + random()
             count = len(self.snd_move)
             sound = self.snd_move[int(random() * count)]
-            self.world.loader.play_sound(sound)
+            self.rsc.play_sound(sound)
       def death_sound(self):
           if self.snd_death and self.in_range():
             count = len(self.snd_death)
             sound = self.snd_death[int(random() * count)]
-            self.world.loader.play_sound(sound)
+            self.rsc.play_sound(sound)
 
       # moving the actor - called from self.controller or main game loop for the protagonist
       def move_left(self):
@@ -346,8 +348,8 @@ class Actor(Drawable):
             hp_color  = (64, 255, 64)
             hp_border = (x - 15, y, 30, 3)
             hp_fill   = (x - 15, y, 30 * (self.hp / self.initial_hp), 3)
-            self.world.view.graphics.rect(hp_color, hp_border, 1)
-            self.world.view.graphics.rect(hp_color, hp_fill, 0)
+            self.world.camera.graphics.rect(hp_color, hp_border, True)
+            self.world.camera.graphics.rect(hp_color, hp_fill, False)
             return True
           return ret
 
@@ -454,14 +456,14 @@ class Background(Drawable):
       stacking = 2
 
       def draw(self, draw_debug = False): 
-          img    = self.img_list[0]
-          bg_w   = img.get_width() 
-          bg_h   = img.get_height()
-          view   = self.world.view
-          offset = (view.pl2sc_x(0) / self.distance) % bg_w - bg_w 
-          count  = int(view.sc_w() / bg_w) + 2 
+          img  = self.img_list[0]
+          bg_w = img.get_width() 
+          bg_h = img.get_height()
+          cam  = self.world.camera
+          offset = (cam.pl2sc_x(0) / self.distance) % bg_w - bg_w 
+          count  = int(cam.sc_w() / bg_w) + 2 
           for i in xrange(count):
-            self.world.view.graphics.blit(img, (offset + i * bg_w, view.sc_h() - bg_h))
+            cam.graphics.blit(img, (offset + i * bg_w, cam.sc_h() - bg_h))
           return True
 
 # controllers

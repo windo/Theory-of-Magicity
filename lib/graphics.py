@@ -11,12 +11,21 @@ try:
 except:
   use_opengl = False
 
+screen_width = 1024
+screen_height = 768
+fullscreen = FULLSCREEN
+
 class provider:
-      def __init__(height, width):
+      screen_width = screen_width
+      screen_height = screen_height
+      def __init__(self):
           pass
+      def center_blit(self, img, x, y):
+          self.blit(img, (screen_width / 2 - img.get_width() / 2 + x, y))
 
 class nographics_provider(provider):
-      def __init__(self, height, width):
+      def __init__(self):
+          dbg("Using no graphics")
           self.screen = None
 
       Font = pygame.font.Font
@@ -26,9 +35,10 @@ class nographics_provider(provider):
       
 
 class pygame_provider(provider):
-      def __init__(self, height, width):
-          flags = FULLSCREEN | HWSURFACE | DOUBLEBUF
-          self.screen = pygame.display.set_mode((height, width), flags)
+      def __init__(self,):
+          dbg("Using pygame (SDL)")
+          flags = fullscreen | HWSURFACE | DOUBLEBUF
+          self.screen = pygame.display.set_mode((screen_width, screen_height), flags)
           self.screen.fill((0, 0, 0, 255))
 
       Font = pygame.font.Font
@@ -57,16 +67,17 @@ class pygame_provider(provider):
             self.screen.fill(color)
       
 class opengl_provider(provider):
-      def __init__(self, height, width):
-          flags = FULLSCREEN | HWSURFACE | DOUBLEBUF | OPENGL
-          self.screen = pygame.display.set_mode((height, width), flags)
+      def __init__(self):
+          dbg("Using OpenGL")
+          flags = fullscreen | HWSURFACE | DOUBLEBUF | OPENGL
+          self.screen = pygame.display.set_mode((screen_width, screen_height), flags)
                 
           glClearColor(0.0, 0.0, 0.0, 1.0)
           glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
       
           glMatrixMode(GL_PROJECTION)
           glLoadIdentity();
-          gluOrtho2D(0, height, width, 0)
+          gluOrtho2D(0, screen_width, screen_height, 0)
           glMatrixMode(GL_MODELVIEW)
       
           glEnable(GL_TEXTURE_2D)
@@ -111,7 +122,12 @@ class opengl_provider(provider):
                   glDeleteTextures(self.__texture)
                 except AttributeError:
                   pass
-                glDeleteLists(self.genlist, 1)
+                except TypeError:
+                  pass
+                try:
+                  glDeleteLists(self.genlist, 1)
+                except TypeError:
+                  pass
       
             def get_width(self):
                 return self.width
@@ -161,8 +177,6 @@ class opengl_provider(provider):
           glColor4f(1.0, 1.0, 1.0, 1.0)
 
 if use_opengl:
-  dbg("Using OpenGL")
   default_provider = opengl_provider
 else:
-  dbg("Using pygame (SDL)")
   default_provider = pygame_provider

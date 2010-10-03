@@ -4,9 +4,10 @@ import pygame, math, time
 from random import random
 import graphics
 
-global circle_cache, circle_cache_hit, circle_cache_miss
+global circle_cache, circle_cache_hit, circle_cache_miss, draw_effects
 circle_cache = {}
 circle_cache_hit = circle_cache_miss = 0
+draw_effects = True
 def get_circle(color, radius, graphics, blur = 0):
     global circle_cache, circle_cache_hit, circle_cache_miss
     # color accuracy
@@ -64,14 +65,17 @@ def get_circle(color, radius, graphics, blur = 0):
 class Dot:
       img_cache_time = 0.1
       def __init__(self, x, y, xs, ys, age = 0.0):
-          self.x   = x
-          self.y   = y
-          self.xs  = xs
-          self.ys  = ys
-          self.age = age
+          self.x    = x
+          self.y    = y
+          self.xs   = xs
+          self.ys   = ys
+          self.age  = age
           # cached image
-          self.img = False
-          self.ts  = 0
+          self.img  = False
+          self.ts   = 0
+          self.seed  = self.xseed = random() * 100
+          self.yseed = random() * 100
+          
 class ParticleEffect:
       normal_particles = 50.0
       def __init__(self, magic = None, intensity = 1.0, max_age = 2.0, xofs = 100.0):
@@ -101,7 +105,8 @@ class ParticleEffect:
 
           # update each dot
           i = 0
-          while i < len(self.dots):
+          dotcount = len(self.dots)
+          while i < dotcount:
             dot = self.dots[i]
             dot.age += timediff
             self.update_speed(dot, timediff)
@@ -110,6 +115,7 @@ class ParticleEffect:
             # age old dots
             if dot.age > self.max_age:
               self.dots.pop(i)
+              dotcount -= 1
             else:
               i += 1
 
@@ -122,6 +128,8 @@ class ParticleEffect:
             self.dots.append(dot)
             
       def draw(self, graphics, draw_debug = False):
+          if not draw_effects:
+            return
           if self.magic:
             now = self.magic.world.get_time()
           else:
@@ -137,10 +145,10 @@ class ParticleEffect:
               dot.ts  = now
               dot.img = s
             if self.magic:
-              view = self.magic.world.view
-              x = view.pl2sc_x(dot.pos) + dot.x - s.get_width() / 2
-              y = view.sc_h() - dot.hover + dot.y - s.get_height() / 2
-              view.graphics.blit(s, (x, y))
+              cam = self.magic.world.camera
+              x = cam.pl2sc_x(dot.pos) + dot.x - s.get_width() / 2
+              y = cam.sc_h() - dot.hover + dot.y - s.get_height() / 2
+              cam.graphics.blit(s, (x, y))
             else:
               graphics.blit(s, (dot.x + self.xofs - s.get_width() / 2, 100 + dot.y - s.get_height() / 2))
 
@@ -199,18 +207,20 @@ class Fire(ParticleEffect):
           x = random() * 10.0 - 5.0
           y = random() * 10.0 - 5.0
           xs = random() * 5.0 - 2.5
-          ys = random() * 5.0 - 30.0
+          ys = random() * 5.0 - 60.0
           return Dot(x, y, xs, ys)
       def get_radius(self, dot):
           if dot.age < 0.1:
             return 5.0, 1.0
           else:
-            return min(5 + dot.age ** 2 * 3.0, 20), 2.0
+            r = min(5 + dot.age ** 2 * 5.0, 20)
+            return r, r / 2.0
       def get_color(self, dot):
           return self.firegradient.get_color(dot.age)
       def update_speed(self, dot, timediff):
-          dot.ys += timediff * 1.0
-          dot.xs += math.sin(dot.age * 25.0)
+          dot.ys += timediff * 25
+          dot.xs += math.sin(dot.seed + dot.age * 15.0) * 20
+          dot.xs *= 0.9
 
 class Nature(ParticleEffect):
       def __init__(self, *args, **kwargs):
@@ -232,7 +242,6 @@ class Nature(ParticleEffect):
             dot.radius = 1.0, 0.0
           else:
             dot.radius = 5.0, 2.0
-          dot.seed = random() * 100.0
           return dot
       def get_radius(self, dot):
           return dot.radius
@@ -251,7 +260,6 @@ class Wind(ParticleEffect):
           x = random() * 10 - 5.0
           y = random() * 10
           dot = Dot(x, y, 0, 0)
-          dot.seed = random() * 100.0
           if random() < 0.8:
             dot.radius = 1, 0
           else:
@@ -270,8 +278,6 @@ class Wind(ParticleEffect):
 class Energy(ParticleEffect):
       def gen_dot(self):
           dot = Dot(random() * 10.0 - 5.0, random() * 10.0 - 5.0, 0, 0)
-          dot.xseed = random() * 100.0
-          dot.yseed = random() * 100.0
           dot.xdiff = random() / 5.0
           light = 32 * random()
           if self.intensity > 0:
@@ -289,7 +295,11 @@ class Energy(ParticleEffect):
           
 if __name__ == "__main__":
   # TODO: broken since merging to game
-  screen  = pygame.display.set_mode((500, 200)) #, pygame.FULLSCREEN)
+  graphics.screen_width = 500
+  graphics.screen_height = 200
+  graphics.fullscreen = 0
+  g = graphics.default_provider()
+  screen  = g.screen
   overlay = pygame.surface
   clock   = pygame.time.Clock()
   
@@ -313,10 +323,11 @@ if __name__ == "__main__":
           intensity -= 0.1
   
     # draw
-    screen.fill([32, 32, 96, 255])
+    g.clear()
+    g.fill([128, 128, 128])
     for p in fx:
-      p.draw(screen)
-    pygame.display.update()
+      p.draw(g)
+    g.update()
   
     clock.tick(45)
     for p in fx:

@@ -8,6 +8,9 @@ from lib.debug import dbg
 class Planner(Controller):
       """
       Container for planning controller
+
+      Builds a tree of goals, distributes attention and
+      selects the most desired actions
       """
       control_interval = 0.05
       def __init__(self, *args):
@@ -93,6 +96,9 @@ class Planner(Controller):
           self.movement   = movement[1]
 
 class Goal:
+      """
+      Set of required functions and helpers for each goal
+      """
       def __init__(self, controller, *args):
           self.controller = controller
           self.puppet = controller.puppet
@@ -166,6 +172,9 @@ class Goal:
               return scale[i][1]
 
 class TreeGoal(Goal):
+      """
+      A goal with subgoal management
+      """
       # maximum total subgoal score
       maxscore = 2.0
       # maximum total subgoals
@@ -305,6 +314,8 @@ class Operate(TreeGoal):
           self.band.prio += walkprio * self.prio * 0.45
           self.walk.prio += walkprio * self.prio * 0.1
 
+# fighting goals
+
 class KillEnemies(TreeGoal):
       del_subgoals = TreeGoal.del_subgoals_limiting
       def add_subgoals(self):
@@ -361,6 +372,8 @@ class KillEnemy(TreeGoal):
           else:
             self.fireball.prio += self.prio * 0.3
             self.distance.prio += self.prio * 0.7
+
+# movement goals
 
 class FightingDistance(Goal, MovementGoal):
       def __init_goal__(self, target):
@@ -463,6 +476,8 @@ class AvoidFireballs(Goal, MovementGoal):
       def update(self):
           worth, pos = self.best_move()
           self.move_to(pos)
+
+# magic goals
 
 class SetField(TreeGoal):
       def __init_goal__(self, target, field, value):
@@ -591,6 +606,8 @@ class PowerBall(Goal, MagicGoal):
           diff = abs(self.dest_value() - self.ball.mult)
           return self.scale_value(abs(diff), ((0, 0.01), (3, 0.2), (10, 0.6)), smooth = True)
       def dist_prio(self): pass
+
+# actors
 
 class BehavingDragon(Dragon):
       prey    = [Dude, Rabbit, Guardian]

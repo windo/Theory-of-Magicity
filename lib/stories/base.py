@@ -1,28 +1,67 @@
-from lib import fields, actors
 from random import random
 
+from lib import fields, actors
 from lib.debug import dbg
+from lib.resources import Resources
+
+class StoryBook:
+      tree = {}
+      all  = []
+      def get_all(self):
+          return all
+      def get(self, path):
+          path = path.split(".")
+          leaf = self.tree
+          for step in path:
+            if not step:
+              continue
+            leaf = leaf[step]
+          return leaf
+      def add(self, story):
+          path = story.storybook_path.split(".")
+          leaf = self.tree
+          for step in path:
+            if not leaf.has_key(step):
+              leaf[step] = {}
+            leaf = leaf[step]
+          leaf[story.__name__] = story
+          self.all.append(story)
+storybook = StoryBook()
 
 class Story:
-      menuname  = "Blank Story Name"
+      storybook_path = ""
       themesong = "happytheme"
 
       def __init__(self, world):
-          dbg("Starting a story")
           self.world = world
+          self.rsc   = Resources()
           # story state
           self.game_over   = False
           self.game_result = None
+          self.exit_now    = False
           self.set_state("begin")
           self.story_time  = self.world.get_time()
           self.last_narrative = 0
           # stories need narrations
           self.narrations  = []
           self.queue       = []
+          dbg("Starting a story: %s" % (str(self)))
 
+      def __str__(self):
+          return "%s: over=%s result=%s state=%s time=%.1f" % \
+                 (self.__class__.__name__, self.game_over, self.game_result,
+                  self.state, self.world.get_time() - self.story_time)
+
+      @classmethod
+      def story_name(klass):
+          try:
+            return klass.story_title
+          except:
+            return klass.__name__
+
+      @classmethod
       def gen_menuitem(klass):
-          return { "action": klass, "txt": klass.menuname }
-      gen_menuitem = classmethod(gen_menuitem)
+          return { "action": klass, "txt": klass.story_name() }
 
       def default_scenery(self):
           """
@@ -49,7 +88,7 @@ class Story:
             bird.ypos = random() * 10.0
 
           # set music
-          world.loader.set_music(self.themesong)
+          self.rsc.set_music(self.themesong)
 
       # all narrations done!
       def narrated(self, delay = 5.0):
@@ -63,7 +102,7 @@ class Story:
             self.queue.append(id)
           now = self.world.get_time()
           # render
-          img = self.world.loader.textfont.render(text, True, (255, 255, 255))
+          img = self.rsc.fonts.textfont.render(text, True, (255, 255, 255))
           # add to narrations list
           self.narrations.append({ "showtime": now + showtime,
                                    "cleartime": now + showtime + duration,
@@ -89,18 +128,19 @@ class Story:
             self.queue.pop(self.queue.index(id))
 
       def set_state(self, state):
-          self.state      = state
+          self.state = state
           self.state_time = self.world.get_time()
           self.action_times = {}
           self.narrations = []
-          self.queue      = []
-      def set_result(self, result):
-          self.game_over     = True
-          self.game_result   = result
+          self.queue = []
+      def set_result(self, result, exit_now = False):
+          self.game_over = True
+          self.game_result = result
+          self.exit_now = exit_now
           if result:
-            self.game_over_img = self.world.loader.smallgoth.render("You Win!", True, (0, 0, 64))
+            self.game_over_img = self.rsc.fonts.smallgoth.render("You Win!", True, (0, 0, 64))
           else:
-            self.game_over_img = self.world.loader.smallgoth.render("Game Over!", True, (0, 0, 64))
+            self.game_over_img = self.rsc.fonts.smallgoth.render("Game Over!", True, (0, 0, 64))
       def time_passed(self, delay, action = "wait"):
           if not self.action_times.has_key(action):
             self.action_times[action] = self.world.get_time()
@@ -117,20 +157,23 @@ class Story:
 
       # must overload this
       def update(self):
-          pass
+          raise Exception()
+      def get_player(self):
+          raise Exception()
 
       def draw(self, draw_debug = False):
-          g = self.world.view.graphics
+          cam = self.world.camera
+          g = cam.graphics
           # draw game over
           if self.game_over:
             g.blit(self.game_over_img,
-                   (self.world.view.sc_w() / 2 - self.game_over_img.get_width() / 2,
-                    self.world.view.sc_h() / 2 - self.game_over_img.get_height() / 2 - 100))
+                   (cam.sc_w() / 2 - self.game_over_img.get_width() / 2,
+                    cam.sc_h() / 2 - self.game_over_img.get_height() / 2 - 100))
 
           # proccess narratives
-          draw_list    = []
+          draw_list = []
           extra_offset = 0
-          i            = 0
+          i = 0
           now = self.world.get_time()
           while i < len(self.narrations):
             narr = self.narrations[i]

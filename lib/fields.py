@@ -2,6 +2,7 @@ from random import random
 import pygame, math
 import effects
 import actors
+from resources import Resources
 from lib.debug import dbg
 
 class MagicField:
@@ -18,9 +19,9 @@ class MagicField:
       # maximum distance where particles will have an effect
       maxdist = 25
 
-      def __init__(self, loader):
+      def __init__(self):
           self.particles = []
-          self.loader    = loader
+          self.rsc = Resources()
       def __str__(self):
           return self.__class__.__name__
       def __repr__(self):
@@ -56,8 +57,10 @@ class MagicField:
                 last -= half
           
             # count all of them
-            while i < len(self.particles) and self.particles[i].pos < pos + self.maxdist:
+            edge = pos + self.maxdist
+            while i < total:
               particle = self.particles[i]
+              if particle.pos > edge: break 
               mean, dev, mult = particle.get_params()
               value = 1 / (dev * math.sqrt(2 * math.pi)) * math.exp((-(pos - mean) ** 2)/(2 * dev ** 2)) * mult
               v += value
@@ -67,15 +70,15 @@ class MagicField:
       def update(self):
           self.particles.sort(lambda x, y: cmp(x.pos, y.pos))
 
-      # Get the field's value at pos as translated through the view
-      def draw(self, view, draw_debug = False):
+      # Get the field's value at pos as translated through the camera view
+      def draw(self, camera, draw_debug = False):
           # step should be float to cover the whole range
-          step = float(view.sc_w()) / float(self.draw_real_points)
-          cur  = self.value(view.sc2pl_x(0))
+          step = float(camera.sc_w()) / float(self.draw_real_points)
+          cur  = self.value(camera.sc2pl_x(0))
           for i in xrange(self.draw_real_points):
             i   += 1
             pos  = i * step
-            next = self.value(view.sc2pl_x(pos))
+            next = self.value(camera.sc2pl_x(pos))
             for j in xrange(self.interpolate):
               value = cur + (next - cur) / self.interpolate * j
               # draw
@@ -83,17 +86,17 @@ class MagicField:
                 # color of the line segment
                 alpha = min(192, abs(value) * 256 * 8)
                 color = self.color + (alpha,)
-                s = effects.get_circle(color, min(5, abs(value) * 100), view.graphics, 3)
-                ypos = view.sc_h() - (value + 1.0) * view.sc_h() / 2.0
-                view.graphics.blit(s, (pos - step + j * step / self.interpolate, ypos))
+                s = effects.get_circle(color, min(5, abs(value) * 100), camera.graphics, 3)
+                ypos = camera.sc_h() - (value + 1.0) * camera.sc_h() / 2.0
+                camera.graphics.blit(s, (pos - step + j * step / self.interpolate, ypos))
 
             # draw debug
             if draw_debug and i % (self.draw_real_points / 5) == 0 and abs(cur) > 0.01:
-              at  = view.sc2pl_x(pos)
+              at  = camera.sc2pl_x(pos)
               txt = "%s.value(%.2f:%.2f) = %.2f" % (str(self), i, at, next)
-              txt = self.loader.debugfont.render(txt, True, (255, 255, 255))
-              ypos = view.sc_h() - (next + 1.0) * view.sc_h() / 2.0
-              view.graphics.blit(txt, (pos, ypos))
+              txt = self.rsc.fonts.debugfont.render(txt, True, (255, 255, 255))
+              ypos = camera.sc_h() - (next + 1.0) * camera.sc_h() / 2.0
+              camera.graphics.blit(txt, (pos, ypos))
 
             # next interpolation
             cur = next

@@ -1,9 +1,10 @@
 from lib import actors
-from lib.stories import Story
+from lib.stories import Story, storybook
 from random import random
 
 class Shepherd(Story):
-      menuname = "Gentle Shepherd"
+      story_title = "Gentle Shepherd"
+      storybook_path = "campaign"
       def __init__(self, *args):
           Story.__init__(self, *args)
 
@@ -23,10 +24,10 @@ class Shepherd(Story):
           # player-controlled object
           self.dude = world.new_actor(actors.Dude, 75.0)
 
-          world.view.goto(-50.0)
-          world.view.follow(self.dude, pan = True)
+          world.camera.goto(-50.0)
+          world.camera.follow(self.dude, pan = True)
 
-      def player(self):
+      def get_player(self):
           return self.dude
 
       def update(self):
@@ -181,9 +182,11 @@ class Shepherd(Story):
               self.narrate("...change it's wind direction ['w' and 's' keys]...", duration = 10.0)
               self.narrate("...and move it close to rabbits ['a' and 'd' keys]...", duration = 10.0)
               self.narrate("...to guide them between the posts [to the right].", duration = 10.0)
+storybook.add(Shepherd)
 
 class Massacre(Story):
-      menuname  = "Fiery Massacre"
+      story_title  = "Fiery Massacre"
+      storybook_path = "campaign"
       themesong = "warmarch2"
       def __init__(self, *args):
           Story.__init__(self, *args)
@@ -209,10 +212,10 @@ class Massacre(Story):
           # player-controlled object
           self.dude = world.new_actor(actors.Dude, 10)
 
-          world.view.goto(150.0)
-          world.view.follow(self.dude, pan = True)
+          world.camera.goto(150.0)
+          world.camera.follow(self.dude, pan = True)
 
-      def player(self):
+      def get_player(self):
           return self.dude
 
       def update(self):
@@ -353,9 +356,11 @@ class Massacre(Story):
             if self.narrated() and state_time % 15 < 1.0:
               rabbits = len(self.world.get_actors(include = [ actors.Rabbit ]))
               self.narrate("Slay the dragons! There are still %u rabbits left to save!" % (rabbits))
+storybook.add(Massacre)
 
 class Blockade(Story):
-      menuname  = "Guardian Blockade"
+      story_title  = "Guardian Blockade"
+      storybook_path = "campaign"
       themesong = "warmarch2"
       def __init__(self, *args):
           Story.__init__(self, *args)
@@ -371,10 +376,10 @@ class Blockade(Story):
           # player-controlled object
           self.dude = world.new_actor(actors.Dude, 0)
 
-          world.view.goto(100)
-          world.view.follow(self.dude, pan = True)
+          world.camera.goto(100)
+          world.camera.follow(self.dude, pan = True)
 
-      def player(self):
+      def get_player(self):
           return self.dude
 
       def update(self):
@@ -425,9 +430,11 @@ class Blockade(Story):
               if dragons < 2:
                 dragon = self.world.new_actor(actors.HuntingDragon, self.dude.pos - 75 + random() * 10)
                 dragon.controller.set_waypoint(200.0)
+storybook.add(Blockade)
 
 class Siege(Story):
-      menuname  = "Under Siege"
+      story_title  = "Under Siege"
+      storybook_path = "campaign"
       themesong = "warmarch2"
       def __init__(self, *args):
           Story.__init__(self, *args)
@@ -459,10 +466,10 @@ class Siege(Story):
           # player-controlled object
           self.dude = world.new_actor(actors.Dude, -50)
 
-          world.view.goto(200.0)
-          world.view.follow(self.dude, pan = True)
+          world.camera.goto(200.0)
+          world.camera.follow(self.dude, pan = True)
 
-      def player(self):
+      def get_player(self):
           return self.dude
 
       def update(self):
@@ -560,6 +567,4 @@ class Siege(Story):
             if sum([guardian.controller.waypoint and 1 or 0 for guardian in self.guardians]) == 0:
               self.set_result(True)
               self.set_state("guardpost-secured")
-
-
-
+storybook.add(Siege)
