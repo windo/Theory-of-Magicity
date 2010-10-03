@@ -1,6 +1,6 @@
 import math, time
 from random import random
-from lib import fields
+from lib import fields, debug
 from lib.resources import Resources
 
 class Drawable:
@@ -29,12 +29,15 @@ class Drawable:
       # position is counted from upper edge of screen
       from_ceiling = False
 
-      # if draw_debug has any effect on this actor class
-      in_dev_mode    = False
+      # create new instances with debug_me set
+      in_dev_mode = False
+
+      seq = 0
 
       def __init__(self, world, pos):
           self.world = world
-          self.id    = world.next_actor_id()
+          self.id    = self.__class__.seq
+          self.__class__.seq += 1
           self.rsc   = Resources() 
           # movement params
           self.pos    = pos
@@ -79,7 +82,7 @@ class Drawable:
 
       # used for drawing debug information - may overload to add more information
       def __str__(self):
-          return "%s(%u)" % (self.__class__.__name__, self.id)
+          return "%s-%u" % (self.__class__.__name__, self.id)
       def __repr__(self):
           return self.__str__()
       def debug_info(self):
@@ -114,7 +117,7 @@ class Drawable:
             y = cam.sc_h() - self.img_h - y
 
           return x, y
-      def draw(self, draw_debug = False):
+      def draw(self):
           """
           Draw the image on screen, called in sequence from main game loop for each actor
           """
@@ -124,17 +127,6 @@ class Drawable:
           # do not draw off-the screen actors
           if x + self.img_w / 2 < 0 or x - self.img_w / 2 > cam.sc_w():
             return False
-
-          # draw debugging information
-          if draw_debug and self.debug_me:
-            lines = self.debug_info().split("\n")
-            txts  = []
-            for line in lines:
-              txts.append(self.rsc.fonts.debugfont.render(line, True, (255, 255, 255)))
-            i = 0
-            for txt in txts:
-              cam.graphics.blit(txt, (x, 70 + i * 20))
-              i += 1
 
           # do not draw/animate spriteless actors
           if len(self.sprite_names) == 0:
@@ -336,11 +328,11 @@ class Actor(Drawable):
               self.controller.update()
               self.last_control = self.world.get_time()
       
-      def draw(self, draw_debug = False):
+      def draw(self):
           """
           Draw the image on screen, called in sequence from main game loop for each actor
           """
-          ret = Drawable.draw(self, draw_debug)
+          ret = Drawable.draw(self)
 
           # draw hp bar (if there is one)
           if self.initial_hp:
@@ -455,7 +447,7 @@ class Background(Drawable):
       distance = 3.0
       stacking = 2
 
-      def draw(self, draw_debug = False): 
+      def draw(self): 
           img  = self.img_list[0]
           bg_w = img.get_width() 
           bg_h = img.get_height()

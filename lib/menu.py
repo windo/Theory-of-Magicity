@@ -1,7 +1,6 @@
 import types
 from lib.resources import Resources
-from lib.stories import Story, storybook
-from lib.stories import campaign, testlevels
+from lib import stories
 from lib.world import World
 
 import pygame
@@ -34,7 +33,7 @@ class MenuItem:
       def is_exit(self, action):
           return isinstance(action, ExitAction)
       def is_story(self, action):
-          return type(action) == types.ClassType and issubclass(action, Story)
+          return type(action) == types.ClassType and issubclass(action, stories.Story)
       def is_menu(self, action):
           return isinstance(action, Menu)
 
@@ -123,21 +122,22 @@ class Menu:
             elif select < 0:
               select = len(self.items) - 1
 
+sb = stories.storybook
 m = story_menu = Menu("Campaign")
-m.add(storybook.get("campaign.Shepherd"))
-m.add(storybook.get("campaign.Massacre"))
-m.add(storybook.get("campaign.Blockade"))
-m.add(storybook.get("campaign.Siege"))
+m.add(sb.get("campaign.Shepherd"))
+m.add(sb.get("campaign.Massacre"))
+m.add(sb.get("campaign.Blockade"))
+m.add(sb.get("campaign.Siege"))
 m.add(ExitAction(), "Return")
 
 m = demo_menu = Menu("Demo")
-m.add(storybook.get("demos.TestBed"))
-m.add(storybook.get("demos.MassHunting"))
-m.add(storybook.get("demos.MassBehaving"))
+for t in sb.get_set("demos"):
+  m.add(t)
 m.add(ExitAction(), "Return")
 
 m = test_menu = Menu("Tests")
-m.add(storybook.get("tests.KillTest"))
+for t in sb.get_set("tests"):
+  m.add(t)
 m.add(ExitAction(), "Return")
 
 m = title_menu = Menu("Theory of Magicity")

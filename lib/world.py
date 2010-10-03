@@ -1,12 +1,10 @@
 import pygame, time, math
 
-import actors
-from camera import Camera
-from inputs import *
-from fields import all as fieldtypes
-from resources import Resources
-import debug
-dbg = debug.dbg
+from lib import debug, actors
+from lib.camera import Camera
+from lib.inputs import *
+from lib.fields import all as fieldtypes
+from lib.resources import Resources
 
 import pygame
 from pygame.locals import *
@@ -29,6 +27,8 @@ class TimeKeeper:
           self.real_queue = []
           self.game_queue = []
 
+          self.lag_rl = debug.RateLimit(1.0)
+
       # game/real time management
       def get_game_time(self):
           return self.game_time
@@ -39,7 +39,8 @@ class TimeKeeper:
           return self.last_real_time + game_ofs / self.game_time_speed
 
       def set_game_speed(self, speed):
-          self.game_time_speed = speed
+          if speed >= 0.0:
+            self.game_time_speed = speed
       def get_game_speed(self):
           return self.game_time_speed
       def pause(self):
@@ -110,7 +111,8 @@ class TimeKeeper:
             time.sleep(sleep_time)
           elif sleep_time < -self.max_lag:
             # lagging too much, step faster
-            dbg("Event processing lagging %.3fs, lowering real time frequencies" % (-sleep_time))
+            if self.lag_rl.check():
+              debug.dbg("Event processing lagging %.3fs, lowering real time frequencies" % (-sleep_time))
             real_time_step *= (-sleep_time / self.max_lag) ** 2
           else:
             # accept some lag
@@ -140,30 +142,32 @@ class World:
             field = fieldtype()
             self.fields[fieldtype] = field
           self.actors = []
-          self.actor_id = 0
 
           # initiate story
           self.story = Story(self)
           self.run()
 
       def get_time(self): return self._timekeeper.get_game_time()
-      def pause(self): return self._timekeeper.pause()
+      def pause(self): self._timekeeper.pause()
+      def set_speed(self, val): self._timekeeper.set_game_speed(val)
+      def get_speed(self): return self._timekeeper.get_game_speed()
 
       def run(self):
+          story = self.story
+          player = story.get_player()
           rsc = Resources()
+
+          # debug objects
           tm = debug.StatSet('World main loop timers')
           tm.add(debug.Timer, 
                  'update', 'update_actors', 'update_magic', 'update_fields',
                  'draw', 'draw_actors', 'draw_magic', 'draw_fields', 'events', 'calibrate')
           ct = debug.StatSet('World main loop counters')
           ct.add(debug.RateCounter, 'fps', 'update', 'input')
-          rate_img = draw_times_img = update_times_img = None
           debug_rl = debug.RateLimit(1.0, exp = 0)
-          story = self.story
-          player = story.get_player()
-
-          # extra debugging output
-          draw_debug  = False
+          dd = debug.DrawDebug()
+          draw_debug = False
+          stats = ""
 
           # input event handlers
           if player is not None:
@@ -177,39 +181,6 @@ class World:
             if story.exit_now == True:
               return
             
-            # debug stuff
-            if debug_rl.check():
-              if draw_debug:
-                # dump stats to debug log
-                tm.dump()
-                ct.dump()
-
-              if draw_debug and not self._timekeeper.paused():
-                rate_txt = "FPS: %.1f UPDATE: %.1f EVENT: %.1f" % (ct.fps, ct.update, ct.input)
-
-                draw_left = tm.draw - tm.draw_actors - tm.draw_magic - tm.draw_fields
-                draw_txt = "DRAW=%.3f" % (tm.draw)
-                draw_txt += " (actors=%.3f/%u%% magic=%.3f/%u%% fields=%.3f/%u%% left=%.3f/%u%%)" % \
-                            (tm.draw_actors, tm.draw_actors / tm.draw * 100,
-                             tm.draw_magic, tm.draw_actors / tm.draw * 100,
-                             tm.draw_fields, tm.draw_actors / tm.draw * 100,
-                             draw_left, draw_left / tm.draw * 100)
-                draw_txt += " actors=%u/%u balls=%u/%u" % \
-                            (draw_actor_count, total_actor_count, draw_magic_count, total_magic_count)
-                update_left = tm.update - tm.update_actors - tm.update_magic - tm.update_fields
-                update_txt = "UPDATE=%.3f" % (tm.update)
-                update_txt += " (actors=%.3f/%u%% magic=%.3f/%u%% fields=%.3f/%u%% left=%.3f/%u%%) calibrate=%.3f" % \
-                            (tm.update_actors, tm.update_actors / tm.update * 100,
-                             tm.update_magic, tm.update_actors / tm.update * 100,
-                             tm.update_fields, tm.update_actors / tm.update * 100,
-                             update_left, update_left / tm.update * 100,
-                             tm.calibrate)
-                font = rsc.fonts.debugfont
-                color = (255, 255, 255)
-                rate_img = font.render(rate_txt, True, color)
-                draw_times_img = font.render(draw_txt, True, color)
-                update_times_img = font.render(update_txt, True, color)
-
             # wait for the next scheduler event
             tm.calibrate.start()
             sch_event = self._timekeeper.wait_for_event()
@@ -249,6 +220,8 @@ class World:
               ## draw
               tm.draw.start()
               self.graphics.clear()
+              # clear allocated debug message space
+              dd.clear_allocations()
   
               total_actor_count = total_magic_count = draw_actor_count = draw_magic_count = 0
               # background changes slightly in color
@@ -260,22 +233,25 @@ class World:
                 self.graphics.fill([day * 32, 32 + day * 32, 128 + day * 32])
   
               # draw actors
-              draw_debug = c_game.draw_debug
               self.sort_actors()
   
               tm.draw_actors.start()
               for actor in self.get_actors(exclude = [actors.MagicParticle]):
                 total_actor_count += 1
-                if actor.draw(draw_debug):
+                if actor.draw():
                   draw_actor_count += 1
+                  if draw_debug and actor.debug_me:
+                    dd.draw_msg(actor.debug_info(), *actor.get_xy())
               tm.draw_actors.end()
   
               # magic particles
               tm.draw_magic.start()
               for actor in self.get_actors(include = [actors.MagicParticle]):
                 total_magic_count += 1
-                if actor.draw(draw_debug):
+                if actor.draw():
                   draw_magic_count += 1
+                  if draw_debug and actor.debug_me:
+                    dd.draw_msg(actor.debug_info(), *actor.get_xy())
               tm.draw_magic.end()
   
               # draw fields
@@ -288,13 +264,31 @@ class World:
               story.draw(draw_debug = draw_debug)
   
               # draw performance stats
-              if draw_debug and rate_img and draw_times_img and update_times_img:
-                self.graphics.fill((0,0,0), (10, 10, rate_img.get_width(), rate_img.get_height()))
-                self.graphics.fill((0,0,0), (10, 30, draw_times_img.get_width(), draw_times_img.get_height()))
-                self.graphics.fill((0,0,0), (10, 50, update_times_img.get_width(), update_times_img.get_height()))
-                self.graphics.blit(rate_img, (10, 10))
-                self.graphics.blit(draw_times_img, (10, 30))
-                self.graphics.blit(update_times_img, (10, 50))
+              if draw_debug:
+                if debug_rl.check():
+                  # dump stats to debug log
+                  tm.dump()
+                  ct.dump()
+
+                  # do not update stats when paused
+                  if not self._timekeeper.paused():
+                    def p(t, *parts):
+                        r = ()
+                        for part in parts:
+                          r += (float(part), float(part) / float(t) * 100.0)
+                        return r
+                    stats = "FPS: %.1f UPDATE: %.1f EVENT: %.1f\n" % (ct.fps, ct.update, ct.input)
+                    draw_left = tm.draw - tm.draw_actors - tm.draw_magic - tm.draw_fields
+                    stats += "DRAW=%.3f" % (tm.draw)
+                    stats += " (actors=%.3f/%u%% magic=%.3f/%u%% fields=%.3f/%u%% left=%.3f/%u%%)" % \
+                             p(tm.draw, tm.draw_actors, tm.draw_magic, tm.draw_fields, draw_left)
+                    stats += " actors=%u/%u balls=%u/%u\n" % \
+                             (draw_actor_count, total_actor_count, draw_magic_count, total_magic_count)
+                    update_left = tm.update - tm.update_actors - tm.update_magic - tm.update_fields
+                    stats += "UPDATE=%.3f" % (tm.update)
+                    stats += " (actors=%.3f/%u%% magic=%.3f/%u%% fields=%.3f/%u%% left=%.3f/%u%%) calibrate=%.3f" % \
+                             (p(tm.update, tm.update_actors, tm.update_magic, tm.update_fields, update_left) + (tm.calibrate,))
+                dd.draw_stats(stats)
 
               # draw ball selector
               if c_char is not None and c_char.get_magic:
@@ -317,16 +311,13 @@ class World:
                 if event.type == QUIT or event.type == KEYDOWN and event.key == K_ESCAPE:
                   return
                 c_game.handle(event)
+                draw_debug = c_game.draw_debug
                 if c_char is not None:
                   c_char.handle(event)
               tm.events.end()
               ct.input.count()
 
       ## actor management
-      def next_actor_id(self):
-          id = self.actor_id
-          self.actor_id += 1
-          return id
       def new_actor(self, actor_class, pos):
           actor = actor_class(self, pos)
           self.actors.append(actor)

@@ -28,7 +28,7 @@ class Resources:
           if graphics is not None and self.graphics is None:
             self.__class__.graphics = graphics
           else:
-            dbg("Returning resource instance")
+            dbg("Returning already initialized resources")
             return
 
           if self.graphics is None:
@@ -39,7 +39,7 @@ class Resources:
           self.font("biggoth", "Deutsch.ttf", 104)
           self.font("smallgoth", "Deutsch.ttf", 56)
           self.font("textfont", "angltrr.ttf", 20)
-          self.font("debugfont", "freesansbold.ttf", 16)
+          self.font("debugfont", "Anonymous Pro.ttf", 12)
 
           # scaling function
           if hasattr(pygame.transform, "smoothscale"):

@@ -1,5 +1,3 @@
-from testbed import TestBed, KillTest
+from testbed import TestBed
 from mass import MassBehaving, MassHunting
-all    = [TestBed, KillTest, MassBehaving, MassHunting]
-byname = {}
-for s in all: byname[s.__name__] = s
+from tests import *

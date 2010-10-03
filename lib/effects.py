@@ -127,7 +127,7 @@ class ParticleEffect:
               dot.hover = self.magic.hover_height
             self.dots.append(dot)
             
-      def draw(self, graphics, draw_debug = False):
+      def draw(self, graphics):
           if not draw_effects:
             return
           if self.magic:

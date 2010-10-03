@@ -33,8 +33,7 @@ class Game:
       def title_screen(self):
           menu.title_menu.run()
 
-      def run_test(self, test):
-          Story = stories.storybook.get(test)
+      def run_test(self, Story):
           w = world.World(self.graphics, Story, target_fps = 10.0, game_speed = 100.0)
           debug.dbg("Finished test: %s" % (w.story))
 
@@ -42,21 +41,34 @@ import optparse
 
 if __name__ == "__main__":
    p = optparse.OptionParser()
-   p.add_option("--profile", action = "store_true", dest = "profile")
-   p.add_option("--tests", dest = "tests")
-   p.set_defaults(profile = False)
+   p.add_option("-p", "--profile", action = "store_true", dest = "profile", help = "Run game under cProfile")
+   p.add_option("--tests", dest = "tests", help = "Execute specified tests and exit")
+   p.add_option("--all-tests", action = "store_true", dest = "all_tests", help = "Execute all tests and exit")
+   p.add_option("--test-repeat", dest = "test_repeat", help = "Repeat each test N times and exit", metavar = "N")
+   p.set_defaults(profile = False, all_tests = False, test_repeat = 5)
    (options, args) = p.parse_args()
+
+   if options.all_tests or options.tests:
+     graphics.fullscreen = False
+     graphics.screen_width = 800
+     graphics.screen_height = 400
 
    g = Game()
    if options.profile:
      import cProfile
      cProfile.run("g.title_screen()", "game.stats")
+   # testing
+   elif options.all_tests:
+     Stories = stories.storybook.get_set("tests")
+     for Story in Stories:
+       for i in xrange(int(options.test_repeat)):
+         g.run_test(Story)
    elif options.tests:
      tests = options.tests.split(",")
-     graphics.fullscreen = 0
-     graphics.screen_width = 800
-     graphics.screen_height = 600
      for test in tests:
-       g.run_test(test)
+       Story = stories.storybook.get(test)
+       for i in xrange(int(options.test_repeat)):
+         g.run_test(Story)
+   # normal game
    else:
      g.title_screen()

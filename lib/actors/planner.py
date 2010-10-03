@@ -20,18 +20,28 @@ class Planner(Controller):
 
           self.move_propose = []
           self.move_pos   = self.puppet.pos
+          self.mover      = None
           self.move_score = 0
           self.move_time  = 0.0
 
           self.magic_propose = []
+          self.magic_casters = {}
 
           self.waypoint = self.puppet.pos
       def set_waypoint(self, waypoint):
           self.waypoint = waypoint
 
       def debug_info(self):
-          return "Planner move to=%3.2f score=%3.2f time=%3.1f\n%s" % \
-                 (self.move_pos, self.move_score, self.move_time, self.mission.debug_info())
+          af = self.puppet.magic.affects
+          magic = ""
+          for ball in af.keys():
+            magic += "%s move=%2.1f power=%2.1f [%s]\n" % \
+                     (ball, af[ball][0], af[ball][1],
+                      ", ".join([str(goal) for goal in (self.magic_casters.get(ball) or [])]))
+          return "Planner:\nMove ->%3.2f [%s sc=%3.2f dur=%3.1f]\n%s\n%s" % \
+                 (self.move_pos, self.mover, self.move_score, self.puppet.world.get_time() - self.move_time,
+                 magic[:-1],
+                 self.mission.debug_info())
       def update(self):
           # clear proposals
           self.move_propose  = []
@@ -54,6 +64,20 @@ class Planner(Controller):
 
           for goal, action in magics:
             action, ball, value = action
+            # make note of the caster
+            if not self.magic_casters.has_key(ball):
+              self.magic_casters[ball] = []
+            if not goal in self.magic_casters[ball]:
+              self.magic_casters[ball].append(goal)
+            # remove old notes
+            affected = self.puppet.magic.affects.keys()
+            notes = self.magic_casters.keys()
+            for note in notes:
+              if note not in affected:
+                self.magic_casters[note] = None
+                del self.magic_casters[note]
+              
+            # cast
             self.puppet.magic.capture(ball)
             if action == "move":
               self.puppet.magic.move(ball, value)
@@ -73,6 +97,7 @@ class Planner(Controller):
               self.move_time  = self.puppet.world.get_time()
               self.move_score = 0
               self.move_pos   = self.puppet.pos
+              self.mover      = None
             return
 
           # most important proposal
@@ -92,6 +117,7 @@ class Planner(Controller):
           else:
             self.puppet.move_left()
           self.move_time  = self.puppet.world.get_time()
+          self.mover      = movement[0]
           self.move_score = movement[0].score
           self.movement   = movement[1]
 
@@ -99,6 +125,7 @@ class Goal:
       """
       Set of required functions and helpers for each goal
       """
+      seq = 0
       def __init__(self, controller, *args):
           self.controller = controller
           self.puppet = controller.puppet
@@ -110,19 +137,31 @@ class Goal:
           self.prio  = 0.1
           self.heat  = 0.1
           self.score = 0.01
+          # get a sequence number
+          self.sequence = self.__class__.seq
+          self.__class__.seq += 1
 
           self.goal_args = args
           self.__init_goal__(*args)
 
       def __str__(self):
-          return "%s((%s): h=%1.3f, p=%1.3f, s=%1.3f)" % \
-                 (self.__class__.__name__, ", ".join([str(a) for a in self.goal_args]), self.heat, self.prio, self.score)
+          return "%s-%u" % (self.__class__.__name__, self.sequence)
       def __repr__(self):
           return self.__str__()
-      def debug_info(self, depth = 0):
-          info = "\\" * depth + "-> %s\n" % (self.__str__())
-          for subgoal in self.subgoals:
-            info += subgoal.debug_info(depth + 1)
+      def debug_info(self, last = []):
+          if len(last) == 0:
+            tree = "->"
+          else:
+            tree = "".join([(l and " " or "|") for l in last[:-1]])
+            tree += last[-1] and "\\" or "|"
+            tree += "->"
+          info = "%s %-*s[s=%1.3f p=%1.3f h=%1.3f] (%s)\n" % \
+                 (tree, (25 - len(last)), self.__str__(),
+                  self.score, self.prio, self.heat,
+                  ", ".join([str(a) for a in self.goal_args]))
+          for i in xrange(len(self.subgoals)):
+            subgoal = self.subgoals[i]
+            info += subgoal.debug_info(last + [i == (len(self.subgoals) - 1)])
           return info
 
       def __init_goal__(self, *args):
@@ -130,12 +169,13 @@ class Goal:
           Should be overloaded if there are meaningful arguments for the goal constructor
           """
           pass
+      # TODO: attention algorithm
       def get_heat(self):
           """
           Amount of attention required from parent
 
           close to 0 when goal is satisfied, no action required
-          close to 1 when action is required to fulfill satisfy the goal
+          close to 1 when action is required to fulfill the goal
           """
           raise Exception(str(self.__class__.__name__))
       def dist_prio(self):
@@ -289,7 +329,7 @@ class MovementGoal:
 class Operate(TreeGoal):
       def __init_goal__(self):
           self.kill  = self.add_subgoal(KillEnemies)
-          self.heal  = self.add_subgoal(SetField, self.puppet, LifeField, "-")
+          self.heal  = self.add_subgoal(SetField, self.puppet, self.puppet.LifeField, "-")
           self.dance = self.add_subgoal(AvoidFireballs)
           self.wayp  = self.add_subgoal(GotoWaypoint)
           self.band  = self.add_subgoal(FormBand)
@@ -298,7 +338,7 @@ class Operate(TreeGoal):
       def dist_prio(self):
           hp = self.puppet.hp / self.puppet.initial_hp
 
-          healprio  = self.scale_value(hp, ((0, 1.0), (0.1, 1.0), (0.3, 0.3), (0.8, 0.1), (1.0, 0.01)), smooth = True)
+          healprio  = self.scale_value(hp, ((0, 1.0), (0.1, 1.0), (0.5, 0.7), (0.8, 0.3), (1.0, 0.01)), smooth = True)
           fightprio = (1 - healprio) * 0.8
           walkprio  = (1 - healprio) * 0.2
 
@@ -355,7 +395,7 @@ class KillEnemies(TreeGoal):
 class KillEnemy(TreeGoal):
       def __init_goal__(self, target):
           self.target = target
-          self.fireball = self.add_subgoal(SetField, self.target, LifeField, "+")
+          self.fireball = self.add_subgoal(SetField, self.target, self.puppet.LifeField, "+")
           self.distance = self.add_subgoal(FightingDistance, self.target)
       def get_heat(self):
           if self.target.dead:
@@ -483,28 +523,30 @@ class SetField(TreeGoal):
       def __init_goal__(self, target, field, value):
           self.target = target
           self.field  = field
-          self.balls  = [ field2ball[field] ]
           self.value  = value
       def target_pos(self):
           if isinstance(self.target, Actor): return self.target.pos + self.target.speed
+      def right_sign(self, ball):
+          return (ball.mult > 0 and self.value == "+") or (ball.mult < 0 and self.value == "-")
       def add_subgoals(self):
           pos = self.target.pos
-          targets = self.world.get_actors(pos - 75.0, pos + 75.0, include = self.balls)
-          for target in targets:
+          balls = self.world.get_actors(pos - 75.0, pos + 75.0, include = [field2ball(self.field)])
+          for ball in balls:
+            repel = not self.right_sign(ball)
             m = p = False
             for goal in self.subgoals:
-              if isinstance(goal, MoveBall) and goal.ball == target:
+              if isinstance(goal, MoveBall) and goal.ball == ball and goal.repel == repel:
                 m = True
-              elif isinstance(goal, PowerBall) and goal.ball == target and goal.value == self.value:
+              elif isinstance(goal, PowerBall) and goal.ball == ball and goal.value == self.value:
                 p = True
             if not m:
-              self.add_subgoal(MoveBall, target, self.target)
+              self.add_subgoal(MoveBall, ball, self.target, repel)
             if not p:
-              self.add_subgoal(PowerBall, target, self.value)
+              self.add_subgoal(PowerBall, ball, self.value)
           
           # if there are no balls or just to suprise
-          if len(targets) == 0 or random() > 0.95:
-            self.add_subgoal(CreateBall, LifeBall)
+          if len(balls) == 0 or random() > 0.95:
+            self.add_subgoal(CreateBall, field2ball(self.field))
       def get_heat(self):
           if len(self.subgoals) == 0:
             return 1.0
@@ -524,7 +566,10 @@ class SetField(TreeGoal):
             else:
               diff = abs(self.target.pos + self.target.speed - goal.ball.pos - goal.ball.speed)
               if isinstance(goal, MoveBall):
-                prios[i] *= self.scale_value(diff, ((0, 0.1), (15, 2), (25, 1), (50, 0.7), (100, 0.0)), smooth = True)
+                if not goal.repel == self.right_sign(goal.ball):
+                  prios[i] *= self.scale_value(diff, ((0, 0.1), (15, 2), (25, 1), (50, 0.7), (100, 0.0)), smooth = True)
+                else:
+                  prios[i] = 0.0
               elif isinstance(goal, PowerBall):
                 if abs(goal.ball.mult) < 1.0:
                   prios[i] *= 2
@@ -561,9 +606,10 @@ class MagicGoal:
           self.controller.propose_magic(self, ("power", ball, value))
 
 class MoveBall(Goal, MagicGoal):
-      def __init_goal__(self, ball, target):
+      def __init_goal__(self, ball, target, repel):
           self.ball   = ball
           self.target = target
+          self.repel  = repel
       def target_pos(self):
           if isinstance(self.target, Actor): return self.target.pos + self.target.speed
           else: return self.target
@@ -572,19 +618,29 @@ class MoveBall(Goal, MagicGoal):
           dest = self.target_pos()
           diff = ball.pos + ball.speed - dest
 
-          if abs(diff) < 1.0:
-            self.move(ball, 0)
-          elif diff > 0:
-            self.move(ball, -10)
+          if self.repel:
+            if diff > 0:
+              self.move(ball, 10)
+            else:
+              self.move(ball, -10)
           else:
-            self.move(ball, 10)
+            if abs(diff) < 1.0:
+              self.move(ball, 0)
+            elif diff > 0:
+              self.move(ball, -10)
+            else:
+              self.move(ball, 10)
+            
           return True
       def get_heat(self):
           if self.ball.dead:
             return 0.0
           diff = self.target_pos() - (self.ball.pos + self.ball.speed)
-          score = self.scale_value(abs(diff), ((0, 0.1), (1, 0.5), (5, 0.5), (10, 0.3), (90, 0.3), (150, 0.0)))
-          return score
+          if self.repel:
+            heat = self.scale_value(abs(diff), ((0, 1.0), (1, 0.8), (5, 0.5), (10, 0.3), (25, 0.2), (90, 0.0)))
+          else:
+            heat = self.scale_value(abs(diff), ((0, 0.1), (1, 0.5), (5, 1.0), (10, 0.3), (90, 0.3), (150, 0.0)))
+          return heat
 
 class PowerBall(Goal, MagicGoal):
       def __init_goal__(self, ball, value):

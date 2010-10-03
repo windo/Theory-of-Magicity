@@ -111,9 +111,9 @@ class MagicParticle(Actor):
           else:
             self.deadtimer = False
 
-      def draw(self, draw_debug = False):
+      def draw(self):
           cam = self.world.camera
-          if not Actor.draw(self, draw_debug):
+          if not Actor.draw(self):
             return False
           # draw magic "ball"
           radius = 25 
@@ -124,7 +124,7 @@ class MagicParticle(Actor):
 
           # draw field effects
           for fx in self.particle_effects:
-            fx.draw(cam.graphics, draw_debug)
+            fx.draw(cam.graphics)
             
           # if it's selected
           if self.selected:
@@ -155,4 +155,5 @@ class LifeBall(MagicParticle):
       effectors    = [ effects.Fire, effects.Nature ]
       fieldtype    = fields.LifeField
 
-field2ball = { fields.TimeField: TimeBall, fields.WindField: WindBall, fields.LifeField: LifeBall }
+def field2ball(field):
+    return {fields.TimeField: TimeBall, fields.WindField: WindBall, fields.LifeField: LifeBall }[field.__class__]

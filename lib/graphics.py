@@ -11,6 +11,7 @@ try:
 except:
   use_opengl = False
 
+global fullscreen, screen_width, screen_height
 screen_width = 1024
 screen_height = 768
 fullscreen = FULLSCREEN
@@ -19,12 +20,13 @@ class provider:
       screen_width = screen_width
       screen_height = screen_height
       def __init__(self):
-          pass
+          dbg("Initializing graphics %ux%u fullscreen=%s" % (screen_width, screen_height, fullscreen))
       def center_blit(self, img, x, y):
           self.blit(img, (screen_width / 2 - img.get_width() / 2 + x, y))
 
 class nographics_provider(provider):
-      def __init__(self):
+      def __init__(self, *args, **kwargs):
+          provider.__init__(self, *args, **kwargs)
           dbg("Using no graphics")
           self.screen = None
 
@@ -35,7 +37,8 @@ class nographics_provider(provider):
       
 
 class pygame_provider(provider):
-      def __init__(self,):
+      def __init__(self, *args, **kwargs):
+          provider.__init__(self, *args, **kwargs)
           dbg("Using pygame (SDL)")
           flags = fullscreen | HWSURFACE | DOUBLEBUF
           self.screen = pygame.display.set_mode((screen_width, screen_height), flags)
@@ -65,9 +68,12 @@ class pygame_provider(provider):
             self.screen.fill(color, rect)
           else:
             self.screen.fill(color)
+      def line(self, start, end, color, width = 1):
+          pygame.drawline(self.screen, start, end, color, width)
       
 class opengl_provider(provider):
-      def __init__(self):
+      def __init__(self, *args, **kwargs):
+          provider.__init__(self, *args, **kwargs)
           dbg("Using OpenGL")
           flags = fullscreen | HWSURFACE | DOUBLEBUF | OPENGL
           self.screen = pygame.display.set_mode((screen_width, screen_height), flags)
@@ -173,6 +179,16 @@ class opengl_provider(provider):
           glVertex2f(rect[0] + rect[2], rect[1])
           glVertex2f(rect[0] + rect[2], rect[1] + rect[3])
           glVertex2f(rect[0], rect[1] + rect[3])
+          glEnd()
+          glColor4f(1.0, 1.0, 1.0, 1.0)
+
+      def line(self, start, end, color, width = 1):
+          glLoadIdentity()
+          glColor3f(color[0]/255, color[1]/255, color[2]/255)
+          glBindTexture(GL_TEXTURE_2D, 0)
+          glBegin(GL_LINES)
+          glVertex2f(*start)
+          glVertex2f(*end)
           glEnd()
           glColor4f(1.0, 1.0, 1.0, 1.0)
 

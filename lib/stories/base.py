@@ -5,10 +5,24 @@ from lib.debug import dbg
 from lib.resources import Resources
 
 class StoryBook:
+      """
+      Container for (sets of) stories
+      """
       tree = {}
       all  = []
       def get_all(self):
           return all
+      def get_elements(self, d):
+          set = []
+          for v in d.values():
+            if type(v) == dict:
+              set += self.get_elements(v)
+            else:
+              set.append(v)
+          return set
+      def get_set(self, path):
+          set = self.get(path)
+          return self.get_elements(set)
       def get(self, path):
           path = path.split(".")
           leaf = self.tree

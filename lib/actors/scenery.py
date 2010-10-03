@@ -36,7 +36,7 @@ class Background(Drawable):
       distance = 3.0
       stacking = 2
 
-      def draw(self, draw_debug = False): 
+      def draw(self): 
           img  = self.img_list[0]
           bg_w = img.get_width() 
           bg_h = img.get_height()

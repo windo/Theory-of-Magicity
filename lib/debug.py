@@ -1,7 +1,84 @@
-import sys, re
-import time
+import sys, re, time, string
+
+class DrawDebug:
+      """
+      Handle debugging information on screen
+      """
+      line_height = 14
+      char_width = 8
+      base_x = 10
+      base_y = 50
+      margin = 10
+
+      def __init__(self):
+          # hack to avoid circular imports
+          from lib.resources import Resources
+          self.clear_allocations()
+          self.rsc = Resources()
+      
+      def allocate_space(self, text):
+          """
+          Keep track of next potential free coordinate to fit a message are
+          Try create rows of message areas:
+           * First - allocate columns, tracking max message width
+           * If row is full, start filling a new row
+          """
+          # message are size
+          lines = text.split("\n")
+          longest = max([len(l) for l in lines])
+          width = longest * self.char_width
+          height = len(lines) * self.line_height
+
+          # try to fit to the row
+          if self.alloc_y + height < self.rsc.graphics.screen_height - self.base_y:
+            if width > self.row_width:
+              self.row_width = width
+            pos = (self.alloc_x, self.alloc_y)
+            self.alloc_y += height + self.margin
+          # full, create a new row
+          else:
+            self.alloc_x += self.row_width + self.margin
+            pos = (self.alloc_x, 0)
+            self.alloc_y = height + self.margin
+            self.row_width = width
+          # return actual coordinates
+          x, y = pos
+          return (x + self.base_x, y + self.base_y)
+      def clear_allocations(self):
+          self.alloc_x = 0
+          self.alloc_y = 0
+          self.row_width = 0
+
+      def draw(self, text, x, y, black = False):
+          lines = text.split("\n")
+          line_imgs = []
+          for line in lines:
+            line_imgs.append(self.rsc.fonts.debugfont.render(line, True, (255, 255, 255)))
+          for i in xrange(len(line_imgs)):
+            img = line_imgs[i]
+            txt_y = y + i * self.line_height
+            if black:
+              self.rsc.graphics.fill((0,0,0), (x, txt_y, img.get_width(), img.get_height()))
+            self.rsc.graphics.blit(img, (x, txt_y))
+          return txt_y + self.line_height
+
+      def draw_msg(self, text, obj_x, obj_y):
+          # allocate space and draw message
+          text = string.rstrip(text)
+          x, y = self.allocate_space(text)
+          bottom = self.draw(text, x, y)
+          # draw a line
+          start = (x + self.margin, bottom)
+          end = (obj_x, obj_y)
+          self.rsc.graphics.line(start, end, (255, 255, 255))
+
+      def draw_stats(self, stats):
+          self.draw(stats, 5, 5, black = True)
 
 class RateLimit:
+      """
+      Ratelimiter used for updating debug information
+      """
       def __init__(self, min_int, exp = 0.95, initial_relax = 1.0, initial_estimate = None):
           # current interval estimate
           self.est_int = initial_estimate
@@ -50,7 +127,7 @@ class Debug:
           # whether to ignore the list and just print everything
           self.debug_all = debug_all
           # ratelimiting
-          self.rl = RateLimit(0.2, initial_estimate = 10.0)
+          self.rl = RateLimit(0.1, initial_estimate = 10.0)
 
       def debug(self, message):
           # ratelimit
@@ -132,17 +209,19 @@ class AvgValue(Stat):
 
 class Timer(Stat):
       unit = "ms"
+      e = 0.95
       def __init__(self):
           self.start()
+          self.value = 0.0
       def __str__(self):
           return "%.3f" % (self.get())
       def start(self):
           self.start_time = time.time()
           self.end_time = self.start_time
-          self.value = 0
       def end(self):
           self.end_time = time.time()
-          self.value = (self.end_time - self.start_time) * 1000
+          value = (self.end_time - self.start_time) * 1000.0
+          self.value = self.value * self.e + value * (1 - self.e)
 
 class StatSet:
       """

@@ -22,6 +22,10 @@ class GameControl:
           if event.type == KEYDOWN:
             if event.key == K_p:
               world.pause()
+            elif event.key == K_o:
+              world.set_speed(world.get_speed() - 0.1)
+            elif event.key == K_i:
+              world.set_speed(world.get_speed() + 0.1)
 
             # explicit camera control
             elif event.key == K_j:
@@ -34,6 +38,22 @@ class GameControl:
             # mode switching
             elif event.key == K_TAB:
               self.draw_debug = not self.draw_debug
+
+          elif event.type == MOUSEBUTTONDOWN:
+            if event.button == 3:
+              pos = cam.sc2pl_x(event.pos[0])
+              candidates = world.get_actors(pos - 5, pos + 5)
+              if candidates:
+                # find the closest particle
+                closest = 5
+                select  = False
+                for actor in candidates:
+                  dist = abs(actor.pos - pos)
+                  if dist < closest:
+                    closest = dist
+                    select = actor
+                if select:
+                  select.debug_me ^= 1
 
 class CharacterControl:
       def __init__(self, world, player):
@@ -194,21 +214,6 @@ class CharacterControl:
                 self.sel_magic.selected = True
                 self.mouse_control      = True
                 pygame.mouse.set_visible(False)
-  
-            elif event.button == 3:
-              pos = cam.sc2pl_x(event.pos[0])
-              candidates = world.get_actors(pos - 5, pos + 5)
-              if candidates:
-                # find the closest particle
-                closest = 5
-                select  = False
-                for actor in candidates:
-                  dist = abs(actor.pos - pos)
-                  if dist < closest:
-                    closest = dist
-                    select = actor
-                if select:
-                  select.debug_me ^= 1
   
           elif event.type == MOUSEBUTTONUP:
             if event.button == 1:
