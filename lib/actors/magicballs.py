@@ -47,9 +47,8 @@ class MagicParticle(Actor):
           desc += "\nState: acc=%.1f mult=%.1f\n" % (self.accel, self.mult)
           desc += "Affecting:\n"
           for aff in self.affects:
-            name      = str(aff.actor)
-            acc, mult = aff.affect_particle(self)
-            desc += "%s: acc=%.2f, mult=%.2f\n" % (name, acc, mult)
+            acc, mult = aff.affect_particle(self).get()
+            desc += "%s: acc=%.2f, mult=%.2f\n" % (aff.actor, acc, mult)
           return desc
 
       # MagicCasters register to influence the particle
@@ -88,17 +87,17 @@ class MagicParticle(Actor):
               self.particle_effects[1].update(abs(value))
          
           # each caster can effect the particle
-          accel = 0.0
+          acc = 0.0
           mult  = 0.0
           for caster in self.affects:
             affects = caster.affect_particle(self)
-            accel += affects[0]
-            mult  += affects[1]
+            acc += affects.acc
+            mult += affects.mult
           # smooth changing of multiplier
           multdiff = (mult - self.mult)
           self.mult += self.timediff * multdiff * self.mult_speed
           # acceleration is immediate 
-          self.accel = accel * 3.0
+          self.accel = acc * 3.0
 
           # if the power drops too low, terminate itself
           if abs(self.mult) < 0.1:
@@ -130,13 +129,13 @@ class MagicParticle(Actor):
           if self.selected:
             radius = 50
             s = effects.get_circle((255, 255, 255, 16), radius, cam.graphics)
-            self.world.cam.graphics.blit(s, (x - radius, y - radius))
+            cam.graphics.blit(s, (x - radius, y - radius))
             # affects
             s = effects.get_circle((255, 255, 255, 64), 5, cam.graphics, 2)
             for caster in self.affects:
-              accel, mult = caster.affect_particle(self)
+              acc, mult = caster.affect_particle(self).get()
               for i in xrange(5):
-                xdiff = accel * 55.0 / 10 / 5 * i
+                xdiff = acc * 55.0 / 10 / 5 * i
                 ydiff = mult  * 55.0 / 10 / 5 * i
                 cam.graphics.blit(s, (x - 5 + xdiff, y - 5 - ydiff))
           return True

@@ -73,12 +73,14 @@ class Drawable:
           else:
             # no image, use dummy values
             # TODO: should do something more intelligent for particle effects - they may be wider
-            self.img_w = 100
+            self.img_w = 50
             self.img_h = 100
+          debug.dbg("Created %s" % (self))
 
       def destroy(self):
           # no more updates or drawing
           self.world.del_actor(self)
+          debug.dbg("Destoroyed %s" % (self))
 
       # used for drawing debug information - may overload to add more information
       def __str__(self):
@@ -86,7 +88,11 @@ class Drawable:
       def __repr__(self):
           return self.__str__()
       def debug_info(self):
-          return "%s pos=(%.1f, %.1f) speed=(%.1f, %.1f)" % (str(self), self.pos, self.ypos, self.speed, self.yspeed)
+          return "%s pos=(%.1f, %.1f) speed=(%.1f, %.1f)" % (self, self.pos, self.ypos, self.speed, self.yspeed)
+      def dbg(self, msg):
+          """ write debug messages if debug_me is on """
+          if self.debug_me:
+            debug.dbg(msg, depth = 2)
 
       def update(self):
           """
@@ -128,9 +134,8 @@ class Drawable:
           if x + self.img_w / 2 < 0 or x - self.img_w / 2 > cam.sc_w():
             return False
 
-          # do not draw/animate spriteless actors
+          # do not draw/animate spriteless actors (magic balls)
           if len(self.sprite_names) == 0:
-            # Which ones are these?
             return True
 
           # facing direction
@@ -210,6 +215,7 @@ class Actor(Drawable):
           # instantiate the controller class, if any
           if self.control:
             self.controller = self.control(self)
+            debug.dbg("Controlled by: %s" % (self.controller))
           else:
             self.controller = None
 
@@ -220,6 +226,8 @@ class Actor(Drawable):
 
       def debug_info(self):
           desc = Drawable.debug_info(self)
+          desc += "\n%s" % ("\n".join(["%s: acc=%.1f mult=%.1f" % \
+                                       ((ball,) + self.magic.affects[ball].get()) for ball in self.magic.affects]))
           if self.controller:
             desc += "\nController: %s" % (self.controller.debug_info())
           return desc
@@ -342,9 +350,18 @@ class Actor(Drawable):
             hp_fill   = (x - 15, y, 30 * (self.hp / self.initial_hp), 3)
             self.world.camera.graphics.rect(hp_color, hp_border, True)
             self.world.camera.graphics.rect(hp_color, hp_fill, False)
-            return True
+            return ret
           return ret
 
+class Affect:
+      def __init__(self, acc, mult):
+          self.acc = acc
+          self.mult = mult
+      def correct(self, ratio):
+          self.acc *= ratio
+          self.mult *= ratio
+      def get(self):
+          return self.acc, self.mult
 class MagicCaster:
       """
       Supplements an Actor
@@ -370,7 +387,7 @@ class MagicCaster:
           pos = self.actor.pos + self.actor.direction * self.magic_distance
           particle = self.actor.world.new_actor(particletype, pos)
           # register to influence it [speed, mult]
-          self.affects[particle] = [0.0, 1.0]
+          self.affects[particle] = Affect(0.0, 1.0)
           particle.affect(self)
           # make sure there is enough magic energy
           self.balance_energy()
@@ -381,7 +398,7 @@ class MagicCaster:
           add to the list of controlled particles
           """
           if not self.affects.has_key(particle):
-            self.affects[particle] = [0.0, 0.0]
+            self.affects[particle] = Affect(0.0, 0.0)
             particle.affect(self)
       def release(self, particle):
           """
@@ -398,18 +415,18 @@ class MagicCaster:
             self.release(particle)
 
       # affect controlled particles
-      def move(self, particle, set = False, diff = False):
-          return self.change(particle, 0, set, diff)
-      def power(self, particle, set = False, diff = False):
-          return self.change(particle, 1, set, diff)
+      def move(self, particle, set = None, diff = None):
+          return self.change(particle, "acc", set, diff)
+      def power(self, particle, set = None, diff = None):
+          return self.change(particle, "mult", set, diff)
       def change(self, particle, key, set, diff):
           if self.affects.has_key(particle):
-            if set is not False:
-              self.affects[particle][key] = set
+            if set is not None:
+              self.affects[particle].__dict__[key] = set
             elif diff is not False:
-              self.affects[particle][key] += diff
+              self.affects[particle].__dict__[key] += diff
             else:
-              return self.affects[particle][key]
+              return self.affects[particle].__dict__[key]
             self.balance_energy()
           if not (set or diff):
             return 0.0
@@ -421,19 +438,11 @@ class MagicCaster:
           go over the list of affected particles and make sure we stay within
           the energy consumption limit
           """
-          used = 0.0
-          for speed, power in self.affects.values():
-            used += abs(speed) + abs(power)
+          used = sum([abs(a.acc) + abs(a.mult) for a in self.affects.values()])
           if used > self.energy():
             ratio = self.energy() / used
-            for affect in self.affects.keys():
-              speed, power = self.affects[affect]
-              speed *= ratio
-              power *= ratio
-              self.affects[affect] = [speed, power]
-            corrected = 0.0
-            for speed, power in self.affects.values():
-              corrected += abs(speed) + abs(power)
+            for aff in self.affects.values():
+              aff.correct(ratio)
 
       # called by particles
       def affect_particle(self, particle):

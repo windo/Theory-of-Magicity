@@ -14,8 +14,14 @@ Input:
 
 Output:
  * self stop/left/right
- * create/select/free magic
+ * create/capture/release magic
  * selected magic left/right/up/down
+
+TreeGoals:
+ * Try to fulfill an objective
+ * Set and evaluate subgoals (as black boxes)
+ * Confidence/resource-effectiveness/probability-of-success of fulfulling the objective
+ * Distribute attention, priority between subgoals
 
 Goals:
  * stay_alive

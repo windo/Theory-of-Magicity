@@ -32,23 +32,17 @@ class Planner(Controller):
           self.waypoint = waypoint
 
       def debug_info(self):
-          af = self.puppet.magic.affects
-          magic = ""
-          for ball in af.keys():
-            magic += "%s move=%2.1f power=%2.1f [%s]\n" % \
-                     (ball, af[ball][0], af[ball][1],
-                      ", ".join([str(goal) for goal in (self.magic_casters.get(ball) or [])]))
-          return "Planner:\nMove ->%3.2f [%s sc=%3.2f dur=%3.1f]\n%s\n%s" % \
+          return "Planner:\nMove ->%3.2f [%s sc=%3.2f dur=%3.1f]\n%s" % \
                  (self.move_pos, self.mover, self.move_score, self.puppet.world.get_time() - self.move_time,
-                 magic[:-1],
                  self.mission.debug_info())
       def update(self):
           # clear proposals
           self.move_propose  = []
           self.magic_propose = []
 
+          # incremental prios need to be cleared
           for goal in self.goals.values():
-            goal.prio = 0.0
+            goal.old_prio = True
           self.mission.prio = 1.0
           self.mission.update()
 
@@ -83,6 +77,12 @@ class Planner(Controller):
               self.puppet.magic.move(ball, value)
             elif action == "power":
               self.puppet.magic.power(ball, value)
+
+            # uncapture
+            for ball in self.puppet.magic.affects.keys():
+              aff = self.puppet.magic.affects[ball]
+              if abs(aff.acc) < 0.1 and abs(aff.mult) < 0.1:
+                self.puppet.magic.release(ball)
           
       def propose_movement(self, goal, pos):
           self.move_propose.append((goal, pos))
@@ -93,6 +93,7 @@ class Planner(Controller):
           # no proposals
           if len(self.move_propose) == 0:
             if move_time > 2.0:
+              self.puppet.dbg("%s stopping @%3.1f because of long movement for %s" % (self.puppet, self.puppet.pos, self.mover))
               self.puppet.stop()
               self.move_time  = self.puppet.world.get_time()
               self.move_score = 0
@@ -108,18 +109,23 @@ class Planner(Controller):
           if movement[0].score < self.move_score and move_time < 1.0:
             return
 
-          # change direction!
-          diff = movement[1] - self.puppet.pos
-          if abs(diff) < 1.0:
-            self.puppet.stop()
-          elif diff > 0.0:
-            self.puppet.move_right()
-          else:
-            self.puppet.move_left()
+          # setup vars
           self.move_time  = self.puppet.world.get_time()
           self.mover      = movement[0]
           self.move_score = movement[0].score
           self.movement   = movement[1]
+
+          # change direction!
+          diff = self.movement - self.puppet.pos
+          if abs(diff) < 1.0:
+            self.puppet.dbg("%s stopping because %3.1f is close enough to %3.1f for %s" % (self.puppet, self.puppet.pos, self.movement, self.mover))
+            self.puppet.stop()
+          elif diff > 0.0:
+            self.puppet.dbg("%s moving right %3.1f -> %3.1f for %s" % (self.puppet, self.puppet.pos, self.movement, self.mover))
+            self.puppet.move_right()
+          else:
+            self.puppet.dbg("%s moving left %3.1f -> %3.1f for %s" % (self.puppet, self.puppet.pos, self.movement, self.mover))
+            self.puppet.move_left()
 
 class Goal:
       """
@@ -134,9 +140,11 @@ class Goal:
 
           self.subgoals = []
           self.parents  = []
-          self.prio  = 0.1
+          self.prio  = 0.0
           self.heat  = 0.1
           self.score = 0.01
+          # priority kept for reference from last round - not to be used
+          self.old_prio = True
           # get a sequence number
           self.sequence = self.__class__.seq
           self.__class__.seq += 1
@@ -232,6 +240,10 @@ class TreeGoal(Goal):
           Picks most interesting subgoal and passes execution forward
           """
           # organize subgoals by score
+          for goal in self.subgoals:
+            if goal.old_prio == True:
+              goal.prio = 0.0
+              goal.old_prio = False
           self.dist_prio()
           for goal in self.subgoals:
             # do not constantly check heat of unimportant goals
@@ -250,8 +262,12 @@ class TreeGoal(Goal):
               goal.update()
               break
 
-          if random() < self.prob_addsub or len(self.subgoals) < 2:
-            self.add_subgoals()
+          if self.add_subgoals:
+            if random() < self.prob_addsub or len(self.subgoals) < 2:
+              self.puppet.dbg("Adding subgoals")
+              self.add_subgoals()
+            else:
+              self.puppet.dbg("Not adding subgoals")
 
       def add_subgoal(self, goaltype, *args):
           sig = (goaltype, args)
@@ -274,8 +290,7 @@ class TreeGoal(Goal):
             self.controller.goals[sig] = None
             del self.controller.goals[sig]
 
-      def add_subgoals(self):
-          pass
+      add_subgoals = None
       def del_subgoals(self):
           return sum([g.score for g in self.subgoals])
 
@@ -526,13 +541,13 @@ class SetField(TreeGoal):
           self.value  = value
       def target_pos(self):
           if isinstance(self.target, Actor): return self.target.pos + self.target.speed
-      def right_sign(self, ball):
-          return (ball.mult > 0 and self.value == "+") or (ball.mult < 0 and self.value == "-")
+      def wrong_sign(self, ball):
+          return (ball.mult > 0 and self.value == "-") or (ball.mult < 0 and self.value == "+")
       def add_subgoals(self):
           pos = self.target.pos
           balls = self.world.get_actors(pos - 75.0, pos + 75.0, include = [field2ball(self.field)])
           for ball in balls:
-            repel = not self.right_sign(ball)
+            repel = self.wrong_sign(ball)
             m = p = False
             for goal in self.subgoals:
               if isinstance(goal, MoveBall) and goal.ball == ball and goal.repel == repel:
@@ -543,9 +558,9 @@ class SetField(TreeGoal):
               self.add_subgoal(MoveBall, ball, self.target, repel)
             if not p:
               self.add_subgoal(PowerBall, ball, self.value)
-          
+
           # if there are no balls or just to suprise
-          if len(balls) == 0 or random() > 0.95:
+          if (len(self.subgoals) == 0 or random() > 0.95) and self.heat > 0.1:
             self.add_subgoal(CreateBall, field2ball(self.field))
       def get_heat(self):
           if len(self.subgoals) == 0:
@@ -564,17 +579,17 @@ class SetField(TreeGoal):
             if isinstance(goal, CreateBall):
               prios[i] *= 3
             else:
-              diff = abs(self.target.pos + self.target.speed - goal.ball.pos - goal.ball.speed)
+              diff = abs((self.target.pos + self.target.speed) - (goal.ball.pos + goal.ball.speed))
               if isinstance(goal, MoveBall):
-                if not goal.repel == self.right_sign(goal.ball):
-                  prios[i] *= self.scale_value(diff, ((0, 0.1), (15, 2), (25, 1), (50, 0.7), (100, 0.0)), smooth = True)
+                if goal.repel == self.wrong_sign(goal.ball):
+                  if goal.repel:
+                    prios[i] *= self.scale_value(diff, ((0, 2), (5, 1), (15, 0.7), (50, 0.0)), smooth = True)
+                  else:
+                    prios[i] *= self.scale_value(diff, ((0, 0.1), (3, 2), (15, 1), (50, 0.7), (100, 0.0)), smooth = True)
                 else:
                   prios[i] = 0.0
               elif isinstance(goal, PowerBall):
-                if abs(goal.ball.mult) < 1.0:
-                  prios[i] *= 2
-                else:
-                  prios[i] *= self.scale_value(diff, ((0, 3), (15, 1), (25, 0.5), (100, 0.0)), smooth = True)
+                prios[i] *= self.scale_value(diff, ((0, 2), (15, 1), (50, 0.3), (100, 0.0)), smooth = True)
             total += prios[i]
           if total == 0.0:
             return
@@ -647,12 +662,8 @@ class PowerBall(Goal, MagicGoal):
           self.ball  = ball
           self.value = value
       def dest_value(self):
-          if self.value == "+":
-            return self.puppet.magic_energy
-          elif self.value == "-":
-            return -self.puppet.magic_energy
-          else:
-            return self.value
+          e = self.puppet.magic_energy
+          return {"+": e, "-": -e}.get(self.value) or self.value
       def update(self):
           self.power(self.ball, self.dest_value())
           return True

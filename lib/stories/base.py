@@ -59,11 +59,13 @@ class Story:
           # stories need narrations
           self.narrations  = []
           self.queue       = []
-          dbg("Starting a story: %s" % (str(self)))
+          dbg("Starting a story: %s" % (self))
 
       def __str__(self):
+          return self.__class__.__name__
+      def debug_info(self):
           return "%s: over=%s result=%s state=%s time=%.1f" % \
-                 (self.__class__.__name__, self.game_over, self.game_result,
+                 (self, self.game_over, self.game_result,
                   self.state, self.world.get_time() - self.story_time)
 
       @classmethod

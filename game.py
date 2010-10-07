@@ -1,41 +1,9 @@
 #!/usr/bin/python
 
-import time, sys, math, types
-from random import random
-
 # pygame
 import pygame
-from pygame.locals import *
-
-# game libraries
-from lib import *
-from lib.stories import campaign, testlevels
-
-class Game:
-      """
-      Implements title screen, menu
-      Runs different levels (stories) - the main game loop
-      """
-      name  = "Theory of Magicity"
-      def __init__(self):
-          # initialize pygame
-          pygame.init()
-          pygame.mixer.init()
-          pygame.display.set_caption(self.name)
-          pygame.key.set_repeat(300, 150)
-          self.clock = pygame.time.Clock()
-
-          # screen params
-          debug.dbg("Setting up graphics and resources")
-          self.graphics = graphics.default_provider()
-          resources.Resources(self.graphics)
-
-      def title_screen(self):
-          menu.title_menu.run()
-
-      def run_test(self, Story):
-          w = world.World(self.graphics, Story, target_fps = 10.0, game_speed = 100.0)
-          debug.dbg("Finished test: %s" % (w.story))
+pygame.init()
+pygame.key.set_repeat(300, 150)
 
 import optparse
 
@@ -45,30 +13,50 @@ if __name__ == "__main__":
    p.add_option("--tests", dest = "tests", help = "Execute specified tests and exit")
    p.add_option("--all-tests", action = "store_true", dest = "all_tests", help = "Execute all tests and exit")
    p.add_option("--test-repeat", dest = "test_repeat", help = "Repeat each test N times and exit", metavar = "N")
+   p.add_option("--screen", dest = "screen_size", help = "Screen size WIDTHxHEIGHT", metavar = "WxH")
+   p.add_option("--fullscreen", dest = "fullscreen", action = "store_true", help = "Start in fullscreen")
+   p.add_option("--no-fullscreen", dest = "no_fullscreen", action = "store_true", help = "Start windowed")
    p.set_defaults(profile = False, all_tests = False, test_repeat = 5)
    (options, args) = p.parse_args()
+   
+   from lib.settings import settings
 
+   # set settings
    if options.all_tests or options.tests:
-     graphics.fullscreen = False
-     graphics.screen_width = 800
-     graphics.screen_height = 400
+     settings.set(fullscreen = False, screen_width = 800, screen_height = 400, game_speed = 100.0, target_fps = 5.0, debug = True)
+   if options.screen_size:
+     w, h = options.screen_size.split("x")
+     settings.set(screen_width = int(w), screen_height = int(h))
+   if options.fullscreen:
+     settings.set(fullscreen = True)
+   if options.no_fullscreen:
+     settings.set(fullscreen = False)
+   settings.dump()
 
-   g = Game()
+   from lib import debug, graphics, resources, menu
+   resources.Resources(graphics.default_provider())
+
    if options.profile:
      import cProfile
-     cProfile.run("g.title_screen()", "game.stats")
+     cProfile.run("menu.title_menu.run()", "game.stats")
    # testing
    elif options.all_tests:
-     Stories = stories.storybook.get_set("tests")
+     from lib.stories import testlevels, storybook
+     from lib.world import World
+     Stories = storybook.get_set("tests")
      for Story in Stories:
        for i in xrange(int(options.test_repeat)):
-         g.run_test(Story)
+         w = World(Story)
+         debug.dbg("Finished test: %s" % (w.story.debug_info()))
    elif options.tests:
+     from lib.stories import testlevels, storybook
+     from lib.world import World
      tests = options.tests.split(",")
      for test in tests:
-       Story = stories.storybook.get(test)
+       Story = storybook.get(test)
        for i in xrange(int(options.test_repeat)):
-         g.run_test(Story)
+         w = World(Story)
+         debug.dbg("Finished test: %s" % (w.story.debug_info()))
    # normal game
    else:
-     g.title_screen()
+     menu.title_menu.run()

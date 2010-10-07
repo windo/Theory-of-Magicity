@@ -5,13 +5,12 @@ from fields import all as fieldtypes
 
 import pygame
 from pygame.locals import *
+from lib.settings import settings
 
 class GameControl:
       def __init__(self, world, player):
           self.world = world
           self.player = player
-
-          self.draw_debug = False
 
       def handle(self, event):
           player = self.player
@@ -20,6 +19,7 @@ class GameControl:
 
           # keyboard
           if event.type == KEYDOWN:
+            # game speed
             if event.key == K_p:
               world.pause()
             elif event.key == K_o:
@@ -37,7 +37,9 @@ class GameControl:
 
             # mode switching
             elif event.key == K_TAB:
-              self.draw_debug = not self.draw_debug
+              settings.debug = not settings.debug
+            elif event.key == K_f:
+              pygame.display.toggle_fullscreen()
 
           elif event.type == MOUSEBUTTONDOWN:
             if event.button == 3:

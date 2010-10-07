@@ -1,28 +1,26 @@
 import pygame
 from pygame.locals import *
 from lib.debug import dbg
+from lib.settings import settings
 
 try:
   import OpenGL
   OpenGL.ERROR_CHECKING = False
   from OpenGL.GL import *
   from OpenGL.GLU import *
-  use_opengl = True
+  opengl_available = True
 except:
-  use_opengl = False
-
-global fullscreen, screen_width, screen_height
-screen_width = 1024
-screen_height = 768
-fullscreen = FULLSCREEN
+  opengl_available = False
 
 class provider:
-      screen_width = screen_width
-      screen_height = screen_height
+      screen_width = settings.screen_width
+      screen_height = settings.screen_height
       def __init__(self):
-          dbg("Initializing graphics %ux%u fullscreen=%s" % (screen_width, screen_height, fullscreen))
+          pygame.display.set_caption(settings.game_name)
+          dbg("Initializing graphics %ux%u fullscreen=%s" % \
+              (settings.screen_width, settings.screen_height, settings.fullscreen))
       def center_blit(self, img, x, y):
-          self.blit(img, (screen_width / 2 - img.get_width() / 2 + x, y))
+          self.blit(img, (settings.screen_width / 2 - img.get_width() / 2 + x, y))
 
 class nographics_provider(provider):
       def __init__(self, *args, **kwargs):
@@ -35,13 +33,13 @@ class nographics_provider(provider):
       def clear(self): pass
       def update(self): pass
       
-
 class pygame_provider(provider):
       def __init__(self, *args, **kwargs):
           provider.__init__(self, *args, **kwargs)
           dbg("Using pygame (SDL)")
-          flags = fullscreen | HWSURFACE | DOUBLEBUF
-          self.screen = pygame.display.set_mode((screen_width, screen_height), flags)
+          flags = (settings.fullscreen and FULLSCREEN or 0) | HWSURFACE | DOUBLEBUF
+          dbg("Available modes: %s" % (pygame.display.list_modes(0, flags)))
+          self.screen = pygame.display.set_mode((settings.screen_width, settings.screen_height), flags)
           self.screen.fill((0, 0, 0, 255))
 
       Font = pygame.font.Font
@@ -75,15 +73,16 @@ class opengl_provider(provider):
       def __init__(self, *args, **kwargs):
           provider.__init__(self, *args, **kwargs)
           dbg("Using OpenGL")
-          flags = fullscreen | HWSURFACE | DOUBLEBUF | OPENGL
-          self.screen = pygame.display.set_mode((screen_width, screen_height), flags)
+          flags = (settings.fullscreen and FULLSCREEN or 0) | HWSURFACE | DOUBLEBUF | OPENGL
+          dbg("Available modes: %s" % (pygame.display.list_modes(0, flags)))
+          self.screen = pygame.display.set_mode((settings.screen_width, settings.screen_height), flags)
                 
           glClearColor(0.0, 0.0, 0.0, 1.0)
           glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
       
           glMatrixMode(GL_PROJECTION)
           glLoadIdentity();
-          gluOrtho2D(0, screen_width, screen_height, 0)
+          gluOrtho2D(0, settings.screen_width, settings.screen_height, 0)
           glMatrixMode(GL_MODELVIEW)
       
           glEnable(GL_TEXTURE_2D)
@@ -170,7 +169,7 @@ class opengl_provider(provider):
 
       def fill(self, color, rect = None):
           if rect is None:
-            rect = (0, 0, 1024, 768)
+            rect = (0, 0, settings.screen_width, settings.screen_height)
           glLoadIdentity()
           glColor3f(color[0]/255, color[1]/255, color[2]/255)
           glBindTexture(GL_TEXTURE_2D, 0)
@@ -192,7 +191,8 @@ class opengl_provider(provider):
           glEnd()
           glColor4f(1.0, 1.0, 1.0, 1.0)
 
-if use_opengl:
-  default_provider = opengl_provider
-else:
-  default_provider = pygame_provider
+# choose what is specified, falling back to pygame_provider
+default_provider = { "opengl": opengl_available and opengl_provider or pygame_provider,
+                     "pygame": pygame_provider, "sdl": pygame_provider,
+                     "none": nographics_provider,
+                   }.get(settings.graphics_provider) or pygame_provider

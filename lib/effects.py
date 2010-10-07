@@ -78,6 +78,7 @@ class Dot:
           
 class ParticleEffect:
       normal_particles = 50.0
+      max_width        = 50.0
       def __init__(self, magic = None, intensity = 1.0, max_age = 2.0, xofs = 100.0):
           # how many to generate per second
           self.intensity = intensity
@@ -112,8 +113,8 @@ class ParticleEffect:
             self.update_speed(dot, timediff)
             dot.x   += dot.xs * timediff
             dot.y   += dot.ys * timediff
-            # age old dots
-            if dot.age > self.max_age:
+            # remove dots: old or far away
+            if dot.age > self.max_age or abs(dot.x) > self.max_width:
               self.dots.pop(i)
               dotcount -= 1
             else:

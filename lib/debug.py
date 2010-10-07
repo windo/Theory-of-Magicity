@@ -5,7 +5,7 @@ class DrawDebug:
       Handle debugging information on screen
       """
       line_height = 14
-      char_width = 8
+      char_width = 7
       base_x = 10
       base_y = 50
       margin = 10
@@ -15,6 +15,19 @@ class DrawDebug:
           from lib.resources import Resources
           self.clear_allocations()
           self.rsc = Resources()
+
+      def split(self, text):
+          """ split at newlines if needed """
+          if type(text) == str:
+            return text.strip().split("\n")
+          return text
+      def dimensions(self, text):
+          """ calculate size of message area on screen """
+          lines = self.split(text)
+          longest = max([len(l) for l in lines])
+          width = longest * self.char_width
+          height = len(lines) * self.line_height
+          return width, height
       
       def allocate_space(self, text):
           """
@@ -23,11 +36,8 @@ class DrawDebug:
            * First - allocate columns, tracking max message width
            * If row is full, start filling a new row
           """
-          # message are size
-          lines = text.split("\n")
-          longest = max([len(l) for l in lines])
-          width = longest * self.char_width
-          height = len(lines) * self.line_height
+          width, height = self.dimensions(text)
+          lines = self.split(text)
 
           # try to fit to the row
           if self.alloc_y + height < self.rsc.graphics.screen_height - self.base_y:
@@ -49,11 +59,11 @@ class DrawDebug:
           self.alloc_y = 0
           self.row_width = 0
 
-      def draw(self, text, x, y, black = False):
-          lines = text.split("\n")
+      def draw(self, text, x, y, black = False, color = (255, 255, 255, 255)):
+          lines = self.split(text)
           line_imgs = []
           for line in lines:
-            line_imgs.append(self.rsc.fonts.debugfont.render(line, True, (255, 255, 255)))
+            line_imgs.append(self.rsc.fonts.debugfont.render(line, True, color))
           for i in xrange(len(line_imgs)):
             img = line_imgs[i]
             txt_y = y + i * self.line_height
@@ -62,15 +72,15 @@ class DrawDebug:
             self.rsc.graphics.blit(img, (x, txt_y))
           return txt_y + self.line_height
 
-      def draw_msg(self, text, obj_x, obj_y):
+      def draw_msg(self, text, obj_x = None, obj_y = None):
           # allocate space and draw message
-          text = string.rstrip(text)
           x, y = self.allocate_space(text)
           bottom = self.draw(text, x, y)
           # draw a line
-          start = (x + self.margin, bottom)
-          end = (obj_x, obj_y)
-          self.rsc.graphics.line(start, end, (255, 255, 255))
+          if obj_x and obj_y:
+            start = (x + self.margin, bottom)
+            end = (obj_x, obj_y)
+            self.rsc.graphics.line(start, end, (255, 255, 255))
 
       def draw_stats(self, stats):
           self.draw(stats, 5, 5, black = True)
@@ -121,6 +131,7 @@ class Debug:
       """
       Print debugging messages
       """
+      keep_messages = 15
       def __init__(self, debug_list, debug_all = False):
           # list of modules to print
           self.debug_list = debug_list
@@ -129,18 +140,22 @@ class Debug:
           # ratelimiting
           self.rl = RateLimit(0.1, initial_estimate = 10.0)
 
-      def debug(self, message):
+          self.last_messages = []
+
+      def debug(self, message, depth = 1):
           # ratelimit
           if not self.rl.check():
             return
           # get caller information
-          frame = sys._getframe(1)
+          frame = sys._getframe(depth)
           module_name = frame.f_globals['__name__']
           # check filter
           if self.debug_all or (module_name in self.debug_list):
             # more information
             try:
-              class_name = frame.f_locals['self'].__class__.__name__
+              class_name = str(frame.f_locals['self'])
+              if class_name[0] == "<":
+                class_name = frame.f_locals['self'].__class__.__name__
             except:
               class_name = "<module>"
             func_name = frame.f_code.co_name
@@ -148,7 +163,11 @@ class Debug:
             # print the message
             ts = time.strftime("%H:%M:%S")
             origin = "%s::%s::%s()" % (module_name, class_name, func_name)
-            print "%-8s %-40s %s" % (ts, origin, message)
+            msg = "%-8s %-40s %s" % (ts, origin, message)
+            print msg
+            self.last_messages.append(msg)
+            if len(self.last_messages) > self.keep_messages:
+              self.last_messages.pop(0)
 
 # shared debugger object
 debugger = Debug([], debug_all = True)

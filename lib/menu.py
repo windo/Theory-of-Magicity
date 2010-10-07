@@ -42,7 +42,7 @@ class MenuItem:
           if self.is_exit(action):
             self.menu.active = False
           elif self.is_story(action):
-            World(self.menu.rsc.graphics, action)
+            World(action)
             self.menu.rsc.set_music("happytheme")
           elif self.is_menu(action):
             action.run()
@@ -78,6 +78,7 @@ class Menu:
 
           while self.active:
             # graphics
+            rsc.graphics.clear()
             rsc.graphics.blit(background, (0, 0))
             rsc.graphics.center_blit(titleshadow, 5, 25)
             rsc.graphics.center_blit(title, 0, 20)

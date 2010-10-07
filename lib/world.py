@@ -5,6 +5,7 @@ from lib.camera import Camera
 from lib.inputs import *
 from lib.fields import all as fieldtypes
 from lib.resources import Resources
+from lib.settings import settings
 
 import pygame
 from pygame.locals import *
@@ -70,7 +71,8 @@ class TimeKeeper:
             t = self.get_game_time() + (interval or 0)
           else:
             queue = self.real_queue
-            t = self.get_real_time() + (interval or 0)
+            #t = self.get_real_time() + (interval or 0)
+            t = time.time() + (interval or 0)
           queue.append(self.Event(name, t, interval, game))
           queue.sort(lambda x, y: cmp(x.time, y.time))
 
@@ -112,7 +114,7 @@ class TimeKeeper:
           elif sleep_time < -self.max_lag:
             # lagging too much, step faster
             if self.lag_rl.check():
-              debug.dbg("Event processing lagging %.3fs, lowering real time frequencies" % (-sleep_time))
+              debug.dbg("Event processing lagging %.1fs, lowering real time frequencies" % (-sleep_time))
             real_time_step *= (-sleep_time / self.max_lag) ** 2
           else:
             # accept some lag
@@ -126,15 +128,16 @@ class World:
       A container for all level objects (actors, fields)
       A time source
       """
-      def __init__(self, graphics, Story, target_fps = 30.0, game_speed = 1.0):
-          self.graphics = graphics
-          self.camera = Camera(self.graphics, (0, 100, 0, 50))
+      def __init__(self, Story):
+          self.rsc = Resources()
+          self.camera = Camera(self.rsc.graphics, (0, 100, 0, 50))
 
           self._timekeeper = TimeKeeper()
-          self._timekeeper.schedule('draw', 1.0 / target_fps)
+          self._timekeeper.schedule('draw', 1.0 / settings.target_fps)
           self._timekeeper.schedule('input', 1.0 / 100.0)
-          self._timekeeper.schedule('update', 1.0 / 50.0, game = True)
-          self._timekeeper.set_game_speed(game_speed)
+          self._timekeeper.schedule('update_game', 1.0 / 50.0, game = True)
+          self._timekeeper.schedule('update', 1.0 / 50.0)
+          self._timekeeper.set_game_speed(settings.game_speed)
 
           # world objects
           self.fields = {}
@@ -155,7 +158,7 @@ class World:
       def run(self):
           story = self.story
           player = story.get_player()
-          rsc = Resources()
+          rsc = self.rsc
 
           # debug objects
           tm = debug.StatSet('World main loop timers')
@@ -166,7 +169,6 @@ class World:
           ct.add(debug.RateCounter, 'fps', 'update', 'input')
           debug_rl = debug.RateLimit(1.0, exp = 0)
           dd = debug.DrawDebug()
-          draw_debug = False
           stats = ""
 
           # input event handlers
@@ -186,7 +188,7 @@ class World:
             sch_event = self._timekeeper.wait_for_event()
             tm.calibrate.end()
 
-            if sch_event == "update":
+            if sch_event == "update_game":
               ## update
               tm.update.start()
               # actors moving
@@ -205,8 +207,6 @@ class World:
   
               # storyline evolving
               story.update()
-              # camera movements
-              self.camera.update()
   
               # update fields
               tm.update_fields.start()
@@ -216,10 +216,14 @@ class World:
               tm.update.end()
               ct.update.count()
 
+            elif sch_event == "update":
+              # camera movements
+              self.camera.update()
+
             elif sch_event == "draw":
               ## draw
               tm.draw.start()
-              self.graphics.clear()
+              rsc.graphics.clear()
               # clear allocated debug message space
               dd.clear_allocations()
   
@@ -227,10 +231,10 @@ class World:
               # background changes slightly in color
               if self._timekeeper.paused():
                 day = -1.0
-                self.graphics.fill([16, 32, 96])
+                rsc.graphics.fill([16, 32, 96])
               else:
                 day = math.sin(time.time()) + 1
-                self.graphics.fill([day * 32, 32 + day * 32, 128 + day * 32])
+                rsc.graphics.fill([day * 32, 32 + day * 32, 128 + day * 32])
   
               # draw actors
               self.sort_actors()
@@ -240,7 +244,7 @@ class World:
                 total_actor_count += 1
                 if actor.draw():
                   draw_actor_count += 1
-                  if draw_debug and actor.debug_me:
+                  if settings.debug and actor.debug_me:
                     dd.draw_msg(actor.debug_info(), *actor.get_xy())
               tm.draw_actors.end()
   
@@ -250,25 +254,25 @@ class World:
                 total_magic_count += 1
                 if actor.draw():
                   draw_magic_count += 1
-                  if draw_debug and actor.debug_me:
+                  if settings.debug and actor.debug_me:
                     dd.draw_msg(actor.debug_info(), *actor.get_xy())
               tm.draw_magic.end()
   
               # draw fields
               tm.draw_fields.start()
               for field in self.all_fields():
-                field.draw(self.camera, draw_debug = draw_debug)
+                field.draw(self.camera)
               tm.draw_fields.end()
   
               # draw storyline elements
-              story.draw(draw_debug = draw_debug)
+              story.draw()
   
               # draw performance stats
-              if draw_debug:
+              if settings.debug:
                 if debug_rl.check():
                   # dump stats to debug log
-                  tm.dump()
-                  ct.dump()
+                  #tm.dump()
+                  #ct.dump()
 
                   # do not update stats when paused
                   if not self._timekeeper.paused():
@@ -289,6 +293,7 @@ class World:
                     stats += " (actors=%.3f/%u%% magic=%.3f/%u%% fields=%.3f/%u%% left=%.3f/%u%%) calibrate=%.3f" % \
                              (p(tm.update, tm.update_actors, tm.update_magic, tm.update_fields, update_left) + (tm.calibrate,))
                 dd.draw_stats(stats)
+                dd.draw_msg(debug.debugger.last_messages)
 
               # draw ball selector
               if c_char is not None and c_char.get_magic:
@@ -296,11 +301,11 @@ class World:
                 for ball in c_char.local_balls:
                   ball_txt = rsc.fonts.textfont.render("%u: %s" % (i, ball.__class__.__name__), True, ball.field.color)
                   ball_nr  = rsc.fonts.textfont.render("%u" % (i), True, ball.field.color)
-                  self.graphics.blit(ball_txt, (10, 40 + i * 20))
-                  self.graphics.blit(ball_nr, (self.camera.pl2sc_x(ball.pos), self.camera.sc_h() - 80))
+                  rsc.graphics.blit(ball_txt, (10, 40 + i * 20))
+                  rsc.graphics.blit(ball_nr, (self.camera.pl2sc_x(ball.pos), self.camera.sc_h() - 80))
                   i += 1
 
-              self.graphics.update()
+              rsc.graphics.update()
               tm.draw.end()
               ct.fps.count()
 
@@ -311,7 +316,6 @@ class World:
                 if event.type == QUIT or event.type == KEYDOWN and event.key == K_ESCAPE:
                   return
                 c_game.handle(event)
-                draw_debug = c_game.draw_debug
                 if c_char is not None:
                   c_char.handle(event)
               tm.events.end()

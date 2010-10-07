@@ -35,8 +35,10 @@ class MagicField:
       # add a new normal distribution
       def add_particle(self, particle):
           self.particles.append(particle)
+          dbg("Added particle (total: %u): %s" % (len(self.particles), particle))
       def del_particle(self, particle):
           self.particles.pop(self.particles.index(particle))
+          dbg("Removed particle (total: %u): %s" % (len(self.particles), particle))
       # add all particles together
       def particle_values(self, pos):
           v = self.basevalue
@@ -45,19 +47,20 @@ class MagicField:
           if total > 0:
             # find first particle
             #dbg("Finding first particle")
-            first = i = 0
+            first = middle = 0
             last = total - 1
             while last > first:
               half = int(math.ceil(float(last - first) / 2))
-              i = first + half
+              middle = first + half
               #dbg("first=%u i=%u last=%u" % (first, i, last))
-              if self.particles[i].pos - pos < -self.maxdist:
+              if self.particles[middle].pos < pos - self.maxdist:
                 first += half
               else:
                 last -= half
           
             # count all of them
             edge = pos + self.maxdist
+            i = middle - 1
             while i < total:
               particle = self.particles[i]
               if particle.pos > edge: break 

@@ -28,7 +28,6 @@ class Resources:
           if graphics is not None and self.graphics is None:
             self.__class__.graphics = graphics
           else:
-            dbg("Returning already initialized resources")
             return
 
           if self.graphics is None:
