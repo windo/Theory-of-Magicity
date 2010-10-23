@@ -21,6 +21,7 @@ class MagicField:
 
       def __init__(self):
           self.particles = []
+          self.particle_count = 0
           self.rsc = Resources()
       def __str__(self):
           return self.__class__.__name__
@@ -35,15 +36,15 @@ class MagicField:
       # add a new normal distribution
       def add_particle(self, particle):
           self.particles.append(particle)
-          dbg("Added particle (total: %u): %s" % (len(self.particles), particle))
+          self.particle_count += 1
       def del_particle(self, particle):
           self.particles.pop(self.particles.index(particle))
-          dbg("Removed particle (total: %u): %s" % (len(self.particles), particle))
+          self.particle_count -= 1 
       # add all particles together
       def particle_values(self, pos):
           v = self.basevalue
 
-          total = len(self.particles)
+          total = self.particle_count
           if total > 0:
             # find first particle
             #dbg("Finding first particle")
@@ -74,7 +75,7 @@ class MagicField:
           self.particles.sort(lambda x, y: cmp(x.pos, y.pos))
 
       # Get the field's value at pos as translated through the camera view
-      def draw(self, camera, draw_debug = False):
+      def draw(self, camera):
           # step should be float to cover the whole range
           step = float(camera.sc_w()) / float(self.draw_real_points)
           cur  = self.value(camera.sc2pl_x(0))
@@ -94,12 +95,12 @@ class MagicField:
                 camera.graphics.blit(s, (pos - step + j * step / self.interpolate, ypos))
 
             # draw debug
-            if draw_debug and i % (self.draw_real_points / 5) == 0 and abs(cur) > 0.01:
-              at  = camera.sc2pl_x(pos)
-              txt = "%s.value(%.2f:%.2f) = %.2f" % (str(self), i, at, next)
-              txt = self.rsc.fonts.debugfont.render(txt, True, (255, 255, 255))
-              ypos = camera.sc_h() - (next + 1.0) * camera.sc_h() / 2.0
-              camera.graphics.blit(txt, (pos, ypos))
+            #if draw_debug and i % (self.draw_real_points / 5) == 0 and abs(cur) > 0.01:
+            #  at  = camera.sc2pl_x(pos)
+            #  txt = "%s.value(%.2f:%.2f) = %.2f" % (str(self), i, at, next)
+            #  txt = self.rsc.fonts.debugfont.render(txt, True, (255, 255, 255))
+            #  ypos = camera.sc_h() - (next + 1.0) * camera.sc_h() / 2.0
+            #  camera.graphics.blit(txt, (pos, ypos))
 
             # next interpolation
             cur = next

@@ -1,3 +1,4 @@
 from testbed import TestBed
-from mass import MassBehaving, MassHunting
+from mass import *
+from samples import *
 from tests import *

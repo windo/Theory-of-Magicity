@@ -92,7 +92,7 @@ class Drawable:
       def dbg(self, msg):
           """ write debug messages if debug_me is on """
           if self.debug_me:
-            debug.dbg(msg, depth = 2)
+            debug.dbg("%s: %s" % (self, msg), depth = 2)
 
       def update(self):
           """
@@ -509,6 +509,7 @@ class FSMController(Controller):
             self.state       = newstate
             self.state_start = self.puppet.world.get_time()
             self.action_time = 0.0
+            self.puppet.dbg("State change: %s" % (newstate))
 
       def state_time(self):
           return self.puppet.world.get_time() - self.state_start

@@ -93,7 +93,7 @@ class Planner(Controller):
           # no proposals
           if len(self.move_propose) == 0:
             if move_time > 2.0:
-              self.puppet.dbg("%s stopping @%3.1f because of long movement for %s" % (self.puppet, self.puppet.pos, self.mover))
+              self.puppet.dbg("stopping @%3.1f, long movement for %s" % (self.puppet.pos, self.mover))
               self.puppet.stop()
               self.move_time  = self.puppet.world.get_time()
               self.move_score = 0
@@ -118,13 +118,13 @@ class Planner(Controller):
           # change direction!
           diff = self.movement - self.puppet.pos
           if abs(diff) < 1.0:
-            self.puppet.dbg("%s stopping because %3.1f is close enough to %3.1f for %s" % (self.puppet, self.puppet.pos, self.movement, self.mover))
+            self.puppet.dbg("stopping, %3.1f close enough to %3.1f for %s" % (self.puppet.pos, self.movement, self.mover))
             self.puppet.stop()
           elif diff > 0.0:
-            self.puppet.dbg("%s moving right %3.1f -> %3.1f for %s" % (self.puppet, self.puppet.pos, self.movement, self.mover))
+            self.puppet.dbg("moving right %3.1f -> %3.1f for %s" % (self.puppet.pos, self.movement, self.mover))
             self.puppet.move_right()
           else:
-            self.puppet.dbg("%s moving left %3.1f -> %3.1f for %s" % (self.puppet, self.puppet.pos, self.movement, self.mover))
+            self.puppet.dbg("moving left %3.1f -> %3.1f for %s" % (self.puppet.pos, self.movement, self.mover))
             self.puppet.move_left()
 
 class Goal:
@@ -264,10 +264,7 @@ class TreeGoal(Goal):
 
           if self.add_subgoals:
             if random() < self.prob_addsub or len(self.subgoals) < 2:
-              self.puppet.dbg("Adding subgoals")
               self.add_subgoals()
-            else:
-              self.puppet.dbg("Not adding subgoals")
 
       def add_subgoal(self, goaltype, *args):
           sig = (goaltype, args)
@@ -323,9 +320,7 @@ class TreeGoal(Goal):
           return totalscore
 
 class MovementGoal:
-      """
-      Container for the movement-related methods
-      """
+      """ Container for the movement-related methods """
       def move_to(self, pos):
           self.controller.propose_movement(self, pos)
       def move_away(self, pos):
@@ -369,7 +364,7 @@ class Operate(TreeGoal):
           self.band.prio += walkprio * self.prio * 0.45
           self.walk.prio += walkprio * self.prio * 0.1
 
-# fighting goals
+# action goals
 
 class KillEnemies(TreeGoal):
       del_subgoals = TreeGoal.del_subgoals_limiting
@@ -427,6 +422,10 @@ class KillEnemy(TreeGoal):
           else:
             self.fireball.prio += self.prio * 0.3
             self.distance.prio += self.prio * 0.7
+
+class Heal(TreeGoal):
+      """ Heal yourself and your friends """
+      pass
 
 # movement goals
 

@@ -54,7 +54,7 @@ def get_circle(color, radius, graphics, blur = 0):
               alphas[2 * center - 1 - y][2 * center - 1 - x] = alpha
 
       # optimize for screen
-      if graphics:
+      if graphics and graphics.screen:
         s = s.convert_alpha(graphics.screen)
       s = graphics.image(s)
 
@@ -111,8 +111,8 @@ class ParticleEffect:
             dot = self.dots[i]
             dot.age += timediff
             self.update_speed(dot, timediff)
-            dot.x   += dot.xs * timediff
-            dot.y   += dot.ys * timediff
+            dot.x += dot.xs * timediff
+            dot.y += dot.ys * timediff
             # remove dots: old or far away
             if dot.age > self.max_age or abs(dot.x) > self.max_width:
               self.dots.pop(i)
@@ -212,16 +212,18 @@ class Fire(ParticleEffect):
           return Dot(x, y, xs, ys)
       def get_radius(self, dot):
           if dot.age < 0.1:
-            return 5.0, 1.0
+            return 10.0, 5.0
+          elif dot.age > 1.5:
+            r = max(20.0 - (dot.age - 1.5) * 30, 5)
           else:
-            r = min(5 + dot.age ** 2 * 5.0, 20)
-            return r, r / 2.0
+            r = min(5.0 + dot.age * 10.0, 20)
+          return r, r * 2.0
       def get_color(self, dot):
           return self.firegradient.get_color(dot.age)
       def update_speed(self, dot, timediff):
           dot.ys += timediff * 25
           dot.xs += math.sin(dot.seed + dot.age * 15.0) * 20
-          dot.xs *= 0.9
+          dot.xs *= 0.95
 
 class Nature(ParticleEffect):
       def __init__(self, *args, **kwargs):
@@ -240,9 +242,9 @@ class Nature(ParticleEffect):
       def gen_dot(self):
           dot = Dot(random() * 10 - 5, random() * 25.0, random() * 2.0 - 1.0, 5.0 + random() * 1.0)
           if random() < 0.5:
-            dot.radius = 1.0, 0.0
+            dot.radius = 3.0, 1.0
           else:
-            dot.radius = 5.0, 2.0
+            dot.radius = 10.0, 5.0
           return dot
       def get_radius(self, dot):
           return dot.radius

@@ -30,8 +30,8 @@ class nographics_provider(provider):
 
       Font = pygame.font.Font
       def image(self, img): return img
-      def clear(self): pass
-      def update(self): pass
+      def dummy(self, *args, **kwargs): pass
+      clear = update = fill = rect = blit = dummy
       
 class pygame_provider(provider):
       def __init__(self, *args, **kwargs):
@@ -192,7 +192,15 @@ class opengl_provider(provider):
           glColor4f(1.0, 1.0, 1.0, 1.0)
 
 # choose what is specified, falling back to pygame_provider
-default_provider = { "opengl": opengl_available and opengl_provider or pygame_provider,
-                     "pygame": pygame_provider, "sdl": pygame_provider,
-                     "none": nographics_provider,
-                   }.get(settings.graphics_provider) or pygame_provider
+def default_provider():
+    requested = settings.graphics_provider
+    if requested == "opengl":
+      if opengl_available:
+        return opengl_provider()
+      else:
+        dbg("OpenGL not available, falling back to pygame")
+        return pygame_provider()
+    elif requested == "none":
+      return nographics_provider()
+    else:
+      return pygame_provider()

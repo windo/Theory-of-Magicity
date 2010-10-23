@@ -14,7 +14,7 @@ class Camera:
           # screen / plane
           self.graphics = graphics
 
-          self.view   = [graphics.screen.get_width(), graphics.screen.get_height()]
+          self.view   = [graphics.screen_width, graphics.screen_height]
           self.plane  = list(plane)
           self.recalculate()
           # camera

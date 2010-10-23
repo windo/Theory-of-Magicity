@@ -45,14 +45,16 @@ class MultiKill(Kill):
 storybook.add(MultiKill)
 
 class Evasion(TestBase):
+      subj_class = actors.BehavingVillager
+      enemy_class = actors.HuntingDragon
       enemies = 1
       max_time = 60.0
       def __init__(self, *args):
           Story.__init__(self, *args)
-          self.subj = self.world.new_actor(actors.BehavingVillager, 100.0)
+          self.subj = self.world.new_actor(self.subj_class, 100.0)
           self.prey = []
           for i in xrange(self.enemies):
-            d = self.world.new_actor(actors.HuntingDragon, 25.0 + i * 50.0 / self.enemies)
+            d = self.world.new_actor(self.enemy_class, 25.0 + i * 50.0 / self.enemies)
             self.prey.append(d)
           self.world.camera.follow(self.subj)
 

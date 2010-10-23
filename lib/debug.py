@@ -141,10 +141,11 @@ class Debug:
           self.rl = RateLimit(0.1, initial_estimate = 10.0)
 
           self.last_messages = []
+          self.last_message = ""
 
       def debug(self, message, depth = 1):
           # ratelimit
-          if not self.rl.check():
+          if self.last_message == message and not self.rl.check():
             return
           # get caller information
           frame = sys._getframe(depth)
@@ -163,7 +164,7 @@ class Debug:
             # print the message
             ts = time.strftime("%H:%M:%S")
             origin = "%s::%s::%s()" % (module_name, class_name, func_name)
-            msg = "%-8s %-40s %s" % (ts, origin, message)
+            msg = "%-8s %-50s %s" % (ts, origin, message)
             print msg
             self.last_messages.append(msg)
             if len(self.last_messages) > self.keep_messages:

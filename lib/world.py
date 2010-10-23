@@ -13,6 +13,7 @@ from pygame.locals import *
 class TimeKeeper:
       # during heavy processing, how much lag (in event processing) to accept
       max_lag = 0.5
+      stay_real_time = True
 
       def __init__(self):
           # game/real time are modified in steps by wait() function
@@ -71,8 +72,12 @@ class TimeKeeper:
             t = self.get_game_time() + (interval or 0)
           else:
             queue = self.real_queue
-            #t = self.get_real_time() + (interval or 0)
-            t = time.time() + (interval or 0)
+            if self.stay_real_time:
+              # events are scheduled from stepped real time (may be behind)
+              t = self.get_real_time() + (interval or 0)
+            else:
+              # events are scheduled from current clock
+              t = time.time() + (interval or 0)
           queue.append(self.Event(name, t, interval, game))
           queue.sort(lambda x, y: cmp(x.time, y.time))
 
@@ -113,9 +118,10 @@ class TimeKeeper:
             time.sleep(sleep_time)
           elif sleep_time < -self.max_lag:
             # lagging too much, step faster
-            if self.lag_rl.check():
-              debug.dbg("Event processing lagging %.1fs, lowering real time frequencies" % (-sleep_time))
-            real_time_step *= (-sleep_time / self.max_lag) ** 2
+            if not self.stay_real_time:
+              if self.lag_rl.check():
+                debug.dbg("Event processing lagging %.1fs, lowering real time frequencies" % (-sleep_time))
+              real_time_step *= (-sleep_time / self.max_lag) ** 2
           else:
             # accept some lag
             pass
@@ -279,7 +285,10 @@ class World:
                     def p(t, *parts):
                         r = ()
                         for part in parts:
-                          r += (float(part), float(part) / float(t) * 100.0)
+                          if t == 0:
+                            r += (float(part), 0.0)
+                          else:
+                            r += (float(part), float(part) / float(t) * 100.0)
                         return r
                     stats = "FPS: %.1f UPDATE: %.1f EVENT: %.1f\n" % (ct.fps, ct.update, ct.input)
                     draw_left = tm.draw - tm.draw_actors - tm.draw_magic - tm.draw_fields
